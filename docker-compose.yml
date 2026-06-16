@@ -1,0 +1,195 @@
+services:
+  auth-service:
+    build: ./auth-social
+    container_name: auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: ${AUTH_DB_URL}
+      DB_USERNAME: ${AUTH_DB_USERNAME}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      PROFILE_SERVICE_URL: http://profile-service:8081
+    depends_on:
+      - profile-service
+
+
+
+  profile-service:   # 👈 clean name used for networking
+    build: ./Profile_social-   # 👈 your actual folder name
+    container_name: profile-service
+    ports:
+      - "8081:8081"
+    environment:
+     JWT_SECRET: ${JWT_SECRET}
+     SERVICE_SECRET: ${SERVICE_SECRET}
+
+     MONGO_URI: ${PROFILE_MONGO_URI}
+
+     R2_ACCESS_KEY: ${R2_ACCESS_KEY_PROFILE}
+     R2_SECRET_KEY: ${R2_SECRET_KEY_PROFILE}
+     R2_ACCOUNT_ID: ${R2_ACCOUNT_ID_PROFILE}
+     R2_PUBLIC_BASE_URL: ${R2_PROFILE_BASE_URL}
+     R2_ENDPOINT: ${R2_ENDPOINT_PROFILE}
+
+
+  post-service:
+    build: ./Post_Social
+    container_name: post-service
+    ports:
+      - "8082:8082"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+
+      MONGO_URI: ${POST_MONGO_URI}
+
+      R2_ACCOUNT_ID: ${R2_POST_ACCOUNT_ID}
+      R2_ACCESS_KEY: ${R2_POST_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_POST_SECRET_KEY}
+      R2_POSTS_PUBLIC_URL: ${R2_POSTS_PUBLIC_URL}
+
+
+  likes-service:
+    build: ./social-likesAndcomments
+    container_name: likes-service
+    ports:
+      - "8083:8083"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+
+      MONGO_URI: ${LIKES_MONGO_URI}
+
+
+
+  reel-service:
+    build: ./social_reels
+    container_name: reel-service
+    ports:
+      - "8084:8084"
+    environment:
+      REEL_MONGO_URI: ${REEL_MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      R2_REEL_ACCOUNT_ID: ${R2_REEL_ACCOUNT_ID}
+      R2_REEL_ACCESS_KEY: ${R2_REEL_ACCESS_KEY}
+      R2_REEL_SECRET_KEY: ${R2_REEL_SECRET_KEY}
+      R2_REEL_PUBLIC_URL: ${R2_REEL_PUBLIC_URL}
+
+
+
+
+  interaction-service:
+    build: ./social_interaction
+    container_name: interaction-service
+    ports:
+      - "8085:8085"
+    environment:
+      MONGO_URI: ${INTERACTION_MONGO_URI}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      MY_SECRET_VALUE: ${JWT_SECRET}
+
+
+
+
+  feed-service:
+    build: ./social_feed
+    container_name: feed-service
+    ports:
+      - "8086:8086"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      MONGO_URI: ${FEED_MONGO_URI}
+
+
+
+
+  view-service:
+    build: ./social_view
+    container_name: view-service
+    ports:
+      - "8087:8087"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+
+
+
+  interest-service:
+    build: ./social-interest
+    container_name: interest-service
+    ports:
+      - "8088:8088"
+    environment:
+      MONGO_URI: ${INTEREST_MONGO_URI}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+
+
+
+
+  reelfetch-service:
+    build: ./social-reelFetch
+    container_name: reelfetch-service
+    ports:
+      - "8089:8089"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+
+
+
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - chat-service-a
+      - chat-service-b
+
+
+
+  chat-service-a:
+    build: ./social_chat
+    container_name: chat-service-a
+    environment:
+      INSTANCE_NAME: CHAT-A
+      CHAT_MONGO_URI: ${CHAT_MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      CHAT_R2_ENDPOINT: ${CHAT_R2_ENDPOINT}
+      CHAT_R2_ACCESS_KEY: ${CHAT_R2_ACCESS_KEY}
+      CHAT_R2_SECRET_KEY: ${CHAT_R2_SECRET_KEY}
+      CHAT_R2_PUBLIC_URL: ${CHAT_R2_PUBLIC_URL}
+    depends_on:
+      - redis
+    expose:
+      - "8090"
+
+  chat-service-b:
+    build: ./social_chat
+    container_name: chat-service-b
+    environment:
+      INSTANCE_NAME: CHAT-B
+      CHAT_MONGO_URI: ${CHAT_MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_SECRET: ${SERVICE_SECRET}
+      CHAT_R2_ENDPOINT: ${CHAT_R2_ENDPOINT}
+      CHAT_R2_ACCESS_KEY: ${CHAT_R2_ACCESS_KEY}
+      CHAT_R2_SECRET_KEY: ${CHAT_R2_SECRET_KEY}
+      CHAT_R2_PUBLIC_URL: ${CHAT_R2_PUBLIC_URL}
+    depends_on:
+      - redis
+    expose:
+      - "8090"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
