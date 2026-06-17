@@ -3,6 +3,7 @@ package com.example.social_likes.controller;
 
 import com.example.social_likes.dto.CommentResponseDTO;
 import com.example.social_likes.dto.CreateCommentDTO;
+import com.example.social_likes.enums.LikeTargetType;
 import com.example.social_likes.service.CommentsService;
 import com.example.social_likes.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;

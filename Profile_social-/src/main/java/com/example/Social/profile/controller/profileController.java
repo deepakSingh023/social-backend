@@ -2,11 +2,13 @@ package com.example.Social.profile.controller;
 
 import com.example.Social.profile.dto.*;
 import com.example.Social.profile.entity.profile;
+import com.example.Social.profile.service.PresignedUrlService;
 import com.example.Social.profile.service.ProfileDataFetchService;
 import com.example.Social.profile.service.profileService;
 
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +26,12 @@ public class profileController {
 
     private final ProfileDataFetchService profileDataFetchService;
 
+    private final PresignedUrlService presignedUrlService;
+
+    @Value("${cloudflare.r2.public-base-url}")
+    private String publicBaseUrl;
+
+
     @PostMapping("/create")
     public ResponseEntity<?> fetchOrCreateProfile(
             @RequestBody createProfile request
@@ -33,6 +41,47 @@ public class profileController {
         return ResponseEntity.ok(profile);
     }
 
+
+    @PostMapping("/upload-url")
+    public UploadResponse getUploadUrl(@RequestBody UploadRequest req,
+                                       Authentication authentication) {
+
+        String userId = authentication.getName();
+
+        if (req.contentType() == null ||
+                (!req.contentType().startsWith("image/") && !req.contentType().startsWith("video/"))) {
+            throw new IllegalArgumentException("Only image or video uploads allowed");
+        }
+
+        // 🔒 Sanitize filename
+        String safeFileName = req.fileName().replaceAll("[^a-zA-Z0-9.-]", "_");
+
+        String key = userId + "/" + System.currentTimeMillis() + "-" + safeFileName;
+
+        String uploadUrl = presignedUrlService.generatePresignedUrl(key, req.contentType());
+
+        String fileUrl = publicBaseUrl + "/" + key;
+
+        return new UploadResponse(uploadUrl, fileUrl);
+    }
+
+
+
+    @PostMapping("/avatar")
+    public ResponseEntity<Void> updateAvatar(
+            @RequestBody UpdateAvatarRequest request,
+            Authentication authentication
+    ) {
+
+        String userId = authentication.getName();
+
+        profileService.updateAvatar(
+                userId,
+                request.avatarUrl()
+        );
+
+        return ResponseEntity.ok().build();
+    }
 
     // UPDATE profile fields (JWT required)
     @PutMapping(value = "/update", consumes = "multipart/form-data")

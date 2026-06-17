@@ -25,7 +25,7 @@ public class InternalFilter extends OncePerRequestFilter {
         String url = req.getRequestURI();
 
         return !(url.startsWith("/api/likes") ||
-                url.startsWith("/api/comments/denormalize/update"));
+                url.startsWith("/api/comments/denormalize/"));
 
     }
 

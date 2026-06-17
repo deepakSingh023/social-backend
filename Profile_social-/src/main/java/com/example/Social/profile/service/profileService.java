@@ -16,5 +16,10 @@ public interface profileService {
 
     InternalProfile getInternal(String userId);
 
+    void updateAvatar(
+            String userId,
+            String avatarUrl
+    );
+
 
 }

@@ -1,6 +1,6 @@
 package com.example.social_likes.dto;
 
-
+import com.example.social_likes.enums.LikeTargetType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,4 +17,6 @@ public class CreateCommentDTO {
     private String parentCommentId;
 
     private String content;
+
+    private LikeTargetType commentType;
 }

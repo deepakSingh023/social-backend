@@ -30,4 +30,6 @@ public interface LikesRepository extends MongoRepository<Likes, String> {
 
     boolean existsByUserIdAndTargetId(String userId,String postId);
 
+    void deleteAllByTargetId(String targetId);
+
 }

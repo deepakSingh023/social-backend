@@ -55,6 +55,35 @@ public class profileServiceImpl implements profileService {
                 });
     }
 
+    @Transactional
+    public void updateAvatar(
+            String userId,
+            String avatarUrl
+    ) {
+
+        profile profile = profileRepository
+                .findByUserId(userId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Profile not found"));
+
+        String oldAvatar = profile.getProfilePicUrl();
+
+        profile.setProfilePicUrl(avatarUrl);
+
+        profileRepository.save(profile);
+
+        denormalizeService.denormalize(
+                new DenormalizeDto(
+                        userId,
+                        avatarUrl
+                )
+        );
+
+        if(oldAvatar != null && !oldAvatar.isBlank()){
+            denormalizeService.deleteOldImageAsync(oldAvatar);
+        }
+    }
+
 
 
     @Transactional

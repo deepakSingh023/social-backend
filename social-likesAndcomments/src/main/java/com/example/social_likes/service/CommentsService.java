@@ -2,6 +2,7 @@ package com.example.social_likes.service;
 
 import com.example.social_likes.dto.CommentResponseDTO;
 import com.example.social_likes.dto.CreateCommentDTO;
+import com.example.social_likes.enums.LikeTargetType;
 import org.springframework.data.domain.Page;
 
 import java.util.List;

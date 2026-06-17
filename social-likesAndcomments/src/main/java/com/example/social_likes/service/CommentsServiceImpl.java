@@ -36,6 +36,8 @@ public class CommentsServiceImpl implements CommentsService {
 
     private final LikesService likesService;
 
+    private final LikeAndCommentCleanupService likeAndCommentCleanupService;
+
 
     private static final Logger log = LoggerFactory.getLogger(CommentsServiceImpl.class);
 
@@ -55,12 +57,15 @@ public class CommentsServiceImpl implements CommentsService {
             throw new IllegalArgumentException("Parent comment not found");
         }
 
+        if(data.getCommentType() == null)
+            throw new IllegalArgumentException("Comment type required");
 
         InternalProfile profile = profileClient.getInternalData(userId,secret);
 
         Comments comment = Comments.builder()
                 .postId(data.getPostId())
                 .parentCommentId(data.getParentCommentId())
+                .type(data.getCommentType())
                 .userId(userId)
                 .username(profile.username())
                 .userAvatar(profile.avatar())
@@ -73,7 +78,13 @@ public class CommentsServiceImpl implements CommentsService {
 
         Comments saved = commentsRepository.save(comment);
 
-        denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(comment.getParentCommentId(), ImpressionType.COMMENT,+1), LikeTargetType.COMMENT_REPLY,userId);
+        if(data.getParentCommentId() == null || data.getParentCommentId().isEmpty()){
+            denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(comment.getPostId(),ImpressionType.COMMENT,+1),data.getCommentType(),userId);
+        }else{
+            denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(comment.getParentCommentId(),ImpressionType.COMMENT,+1),LikeTargetType.COMMENT_REPLY,userId);
+
+        }
+
 
         return map(saved,userId);
     }
@@ -88,7 +99,17 @@ public class CommentsServiceImpl implements CommentsService {
             throw new SecurityException("Not allowed");
         }
 
+
         commentsRepository.delete(comment);
+
+        if(comment.getParentCommentId() == null || comment.getParentCommentId().isEmpty()){
+            denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(comment.getPostId(),ImpressionType.COMMENT,-1),comment.getType(),userId);
+        }else{
+            denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(comment.getParentCommentId(),ImpressionType.COMMENT,-1),LikeTargetType.COMMENT_REPLY,userId);
+
+        }
+
+        likeAndCommentCleanupService.deleteReplies(commentId);
     }
 
     @Override
@@ -146,7 +167,7 @@ public class CommentsServiceImpl implements CommentsService {
                         comment.getUserAvatar(),
                         comment.getLikesCount(),
                         comment.getRepliesCount(),
-                        liked.getOrDefault(comment.getPostId(),false),
+                        liked.getOrDefault(comment.getId(),false),
                         userId != null && userId.equals(comment.getUserId()),
                         comment.getCreatedAt()
                 )).toList();
@@ -207,7 +228,7 @@ public class CommentsServiceImpl implements CommentsService {
                         comment.getUserAvatar(),
                         comment.getLikesCount(),
                         comment.getRepliesCount(),
-                        liked.getOrDefault(comment.getPostId(),false),
+                        liked.getOrDefault(comment.getId(),false),
                         userId != null && userId.equals(comment.getUserId()),
                         comment.getCreatedAt()
                 )).toList();

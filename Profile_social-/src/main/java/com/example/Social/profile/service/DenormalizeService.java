@@ -34,10 +34,21 @@ public class DenormalizeService {
     @Async("denormalize")
     public void denormalize(DenormalizeDto data){
 
-            worker.denormPost(data,secret);
-            worker.denormReel(data,secret);
-            worker.denormComment(data,secret);
-            worker.denormInteraction(data,secret);
+        try {
+            worker.denormPost(data, secret);
+        } catch (Exception ignored) {}
+
+        try {
+            worker.denormReel(data, secret);
+        } catch (Exception ignored) {}
+
+        try {
+            worker.denormComment(data, secret);
+        } catch (Exception ignored) {}
+
+        try {
+            worker.denormInteraction(data, secret);
+        } catch (Exception ignored) {}
 
     }
 
