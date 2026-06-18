@@ -39,9 +39,6 @@ public class PostServiceImpl implements PostService {
 
      private final LikeClient likeClient;
 
-
-     private final InteractionClient interactionClient;
-
      private final static Logger log = LoggerFactory.getLogger(PostServiceImpl.class);
 
     @Value("${service.secret}")
@@ -218,7 +215,7 @@ public class PostServiceImpl implements PostService {
 
         deleteFeedService.deleteFeed(postId);
 
-        interactionClient.deleteLikesAndComments(postId,token);
+        likeClient.deleteLikesAndComments(postId,token);
 
 
     }

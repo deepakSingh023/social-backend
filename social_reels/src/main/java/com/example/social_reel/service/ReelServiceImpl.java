@@ -4,7 +4,6 @@ import com.example.social_reel.dto.*;
 import com.example.social_reel.entity.Reel;
 import com.example.social_reel.exceptions.ReelNotFound;
 import com.example.social_reel.repository.ReelRepository;
-import com.example.social_reel.util.InteractionClient;
 import com.example.social_reel.util.LikeClient;
 import com.example.social_reel.util.ProfileClient;
 import com.example.social_reel.util.VideoCompressor;
@@ -36,8 +35,6 @@ public class ReelServiceImpl implements ReelService {
     private final SemanticTagResolver tagResolver;
 
     private final ProfileClient profileClient;
-
-    private final InteractionClient interactionClient;
 
     private static final Logger log = LoggerFactory.getLogger(ReelServiceImpl.class);
 
@@ -147,7 +144,7 @@ public class ReelServiceImpl implements ReelService {
         reelRepository.delete(reel);
         profileClient.updateReelCounter(token,new ReelUpdate(userId,-1));
 
-        interactionClient.deleteLikesAndComments(reelId,token);
+        likeClient.deleteLikesAndComments(reelId,token);
     }
 
     @Override

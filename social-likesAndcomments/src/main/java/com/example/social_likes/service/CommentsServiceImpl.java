@@ -157,22 +157,39 @@ public class CommentsServiceImpl implements CommentsService {
         Map<String,Boolean> liked = likesService.likedList(userId,commentIds);
 
         List<CommentResponseDTO> res = comments.stream()
-                .map(comment -> new CommentResponseDTO(
-                        comment.getId(),
-                        comment.getPostId(),
-                        comment.getParentCommentId(),
-                        comment.getUserId(),
-                        comment.getContent(),
-                        comment.getUsername(),
-                        comment.getUserAvatar(),
-                        comment.getLikesCount(),
-                        comment.getRepliesCount(),
-                        liked.getOrDefault(comment.getId(),false),
-                        userId != null && userId.equals(comment.getUserId()),
-                        comment.getCreatedAt()
-                )).toList();
+                .map(comment -> {
 
-        log.info("data in response size={}",res.size());
+                    boolean owner =
+                            userId != null &&
+                                    userId.equals(comment.getUserId());
+
+                    log.info(
+                            "requestUser={} commentUser={} owner={}",
+                            userId,
+                            comment.getUserId(),
+                            owner
+                    );
+
+                    return new CommentResponseDTO(
+                            comment.getId(),
+                            comment.getPostId(),
+                            comment.getParentCommentId(),
+                            comment.getUserId(),
+                            comment.getContent(),
+                            comment.getUsername(),
+                            comment.getUserAvatar(),
+                            comment.getLikesCount(),
+                            comment.getRepliesCount(),
+                            liked.getOrDefault(comment.getId(),false),
+                            owner,
+                            comment.getCreatedAt()
+                    );
+                })
+                .toList();
+
+
+
+        log.info("data in response size={} ",res.size());
 
         return res;
 

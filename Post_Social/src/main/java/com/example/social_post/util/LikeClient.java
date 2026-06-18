@@ -25,5 +25,11 @@ public interface LikeClient {
             @RequestParam String postId
     );
 
+    @DeleteMapping("/api/comments/denormalize/cleanup")
+    void deleteLikesAndComments(
+            @RequestParam String targetId,
+            @RequestHeader("X-SECRET-TOKEN")String token
+    );
+
 
 }

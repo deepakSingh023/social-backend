@@ -395,7 +395,7 @@ public class FollowService implements RelationService{
 
     @Override
     public Page<FollowRequest> getFollowRequests(String userId , Pageable pageable){
-    return followRequestRepository.findByUserId(userId , pageable);
+    return followRequestRepository.findByFollowedId(userId , pageable);
 
     }
 

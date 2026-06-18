@@ -9,6 +9,8 @@ import com.example.social_likes.enums.ImpressionType;
 import com.example.social_likes.enums.LikeTargetType;
 import com.example.social_likes.repository.LikesRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -26,6 +28,8 @@ public class LikesServiceImpl implements LikesService {
 
     private final LikesRepository likesRepository;
     private final DenormalizeService denormalizeService;
+
+    private static final Logger log = LoggerFactory.getLogger(LikesServiceImpl.class);
 
     @Override
     public LikeResponseDTO createLike(LikeRequestDTO data, String userId) {
@@ -77,9 +81,17 @@ public class LikesServiceImpl implements LikesService {
     @Override
     public LikeResponseDTO removeLike(LikeRequestDTO data, String userId) {
 
-        if (data.getTargetId() == null || data.getTargetType() == null) {
-            throw new IllegalArgumentException("TargetId and TargetType are required");
+        boolean exists = likesRepository.existsByUserIdAndTargetId(userId, data.getTargetId());
+
+        if (!exists) {
+            log.warn("Unlike ignored – like not found for userId={}, targetId={}", userId, data.getTargetId());
+            return LikeResponseDTO.builder()
+                    .targetId(data.getTargetId())
+                    .targetType(data.getTargetType())
+                    .liked(false)
+                    .build();
         }
+
 
         likesRepository.deleteByUserIdAndTargetIdAndTargetType(
                 userId,
@@ -87,7 +99,11 @@ public class LikesServiceImpl implements LikesService {
                 data.getTargetType()
         );
 
-        denormalizeService.denormalizeLikeAndCommentCount(new IncrementDecDto(data.getTargetId(), ImpressionType.LIKE,-1),data.getTargetType(),userId);
+        denormalizeService.denormalizeLikeAndCommentCount(
+                new IncrementDecDto(data.getTargetId(), ImpressionType.LIKE, -1),
+                data.getTargetType(),
+                userId
+        );
 
         return LikeResponseDTO.builder()
                 .targetId(data.getTargetId())

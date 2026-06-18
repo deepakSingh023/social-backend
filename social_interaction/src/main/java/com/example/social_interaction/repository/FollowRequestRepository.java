@@ -10,5 +10,7 @@ public interface FollowRequestRepository
 
     Page<FollowRequest> findByUserId(String userId, Pageable pageable);
 
+    Page<FollowRequest> findByFollowedId(String userId , Pageable pageable);
+
     boolean existsByUserIdAndFollowedId(String userId, String followedId);
 }
