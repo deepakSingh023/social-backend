@@ -13,7 +13,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class PresignedUrlService {
 
-    @Value("${cloudflare.r2.bucket}")
+    @Value("${cloudflare.r2.bucket-name}")
     private String bucket;
 
     private final S3Presigner presigner;

@@ -9,6 +9,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 
@@ -43,6 +44,23 @@ public class R2config {
                                 .pathStyleAccessEnabled(true)
                                 .build()
                 )
+                .build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner() {
+
+        String endpoint =
+                String.format("https://%s.r2.cloudflarestorage.com", accountId);
+
+        return S3Presigner.builder()
+                .credentialsProvider(
+                        StaticCredentialsProvider.create(
+                                AwsBasicCredentials.create(accessKey, secretKey)
+                        )
+                )
+                .region(Region.US_EAST_1)
+                .endpointOverride(URI.create(endpoint))
                 .build();
     }
 }
