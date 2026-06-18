@@ -28,6 +28,23 @@ public class AsyncConfig {
         return thread;
     }
 
+    @Bean(name = "cleanupExecutor")
+    public Executor cleanupExecutor() {
+
+        ThreadPoolTaskExecutor executor =
+                new ThreadPoolTaskExecutor();
+
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(100);
+
+        executor.setThreadNamePrefix("cleanup-");
+
+        executor.initialize();
+
+        return executor;
+    }
+
 
 
 

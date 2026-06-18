@@ -13,6 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,7 +40,15 @@ public class PostServiceImpl implements PostService {
 
     private final  DeleteFeedService deleteFeedService;
 
+    private final LikesAndCommentService likesAndCommentService;
+
+    private final PostCleanupService postCleanupService;
+
+    private final ProfileServiceUpdate profileServiceUpdate;
+
      private final LikeClient likeClient;
+
+     private final MongoTemplate mongoTemplate;
 
      private final static Logger log = LoggerFactory.getLogger(PostServiceImpl.class);
 
@@ -164,16 +175,20 @@ public class PostServiceImpl implements PostService {
                 .createdAt(Instant.now())
                 .build();
 
+
+        Post savedPost = postRepository.save(post);
+
         CreateFeed data2 = new CreateFeed(
                 userId,
-                post.getId()
+                savedPost.getId()
         );
 
         feedAsyncService.createFeed(data2,token);
 
-        profileClient.updatePostCounter(token,new ReelUpdate(userId,+1));
 
-        return postRepository.save(post);
+        profileServiceUpdate.denormProfileAdd(new ReelUpdate(userId,+1));
+
+        return savedPost;
 
     }
 
@@ -181,43 +196,26 @@ public class PostServiceImpl implements PostService {
     @Override
     public void deletePost(String userId, String postId) {
 
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+        Query query = new Query(
+                Criteria.where("_id").is(postId)
+                        .and("userId").is(userId)
+        );
 
-        if (!post.getUserId().equals(userId)) {
-            throw new RuntimeException("You are not allowed to delete this post");
+        Post post = mongoTemplate.findAndRemove(
+                query,
+                Post.class
+        );
+
+        if (post == null) {
+            throw new RuntimeException(
+                    "Post not found or you are not authorized"
+            );
         }
 
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-
-        if (post.getImageUrls() != null) {
-            for (String url : post.getImageUrls()) {
-                futures.add(s3Service.deleteFileAsync(url));
-            }
-        }
-
-        if (post.getVideoUrl() != null) {
-            futures.add(s3Service.deleteFileAsync(post.getVideoUrl()));
-        }
-
-        // Wait for all deletions
-        futures.forEach(f -> {
-            try {
-                f.get();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-
-        profileClient.updatePostCounter(token,new ReelUpdate(userId,-1));
-
-        postRepository.deleteById(postId);
-
-        deleteFeedService.deleteFeed(postId);
-
-        likeClient.deleteLikesAndComments(postId,token);
-
-
+        postCleanupService.cleanupPost(
+                post,
+                userId
+        );
     }
 
     @Override

@@ -12,6 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -35,6 +38,10 @@ public class ReelServiceImpl implements ReelService {
     private final SemanticTagResolver tagResolver;
 
     private final ProfileClient profileClient;
+
+    private final MongoTemplate mongoTemplate;
+
+    private final ReelCleanupService reelCleanupService;
 
     private static final Logger log = LoggerFactory.getLogger(ReelServiceImpl.class);
 
@@ -124,27 +131,26 @@ public class ReelServiceImpl implements ReelService {
     @Override
     public void deleteReel(String reelId, String userId) {
 
-        Reel reel = reelRepository.findById(reelId)
-                .orElseThrow(() -> new RuntimeException("Reel not found"));
-
-        if (!reel.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
-        }
-
-        String key = reel.getVideoUrl()
-                .replace(publicBaseUrl + "/", "");
-
-        s3Client.deleteObject(
-                DeleteObjectRequest.builder()
-                        .bucket(bucket)
-                        .key(key)
-                        .build()
+        Query query = new Query(
+                Criteria.where("_id").is(reelId)
+                        .and("userId").is(userId)
         );
 
-        reelRepository.delete(reel);
-        profileClient.updateReelCounter(token,new ReelUpdate(userId,-1));
+        Reel reel = mongoTemplate.findAndRemove(
+                query,
+                Reel.class
+        );
 
-        likeClient.deleteLikesAndComments(reelId,token);
+        if (reel == null) {
+            throw new RuntimeException(
+                    "Reel not found or you are not authorized"
+            );
+        }
+
+        reelCleanupService.cleanupReel(
+                reel,
+                userId
+        );
     }
 
     @Override

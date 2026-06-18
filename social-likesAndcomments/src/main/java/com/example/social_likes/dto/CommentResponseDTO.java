@@ -1,5 +1,6 @@
 package com.example.social_likes.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +30,7 @@ public class CommentResponseDTO {
 
     private boolean likedByCurrentUser;
 
+    @JsonProperty("isOwner")
     private boolean isOwner;
 
     private Instant createdAt;

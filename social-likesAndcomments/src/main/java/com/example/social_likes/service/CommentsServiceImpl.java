@@ -266,7 +266,7 @@ public class CommentsServiceImpl implements CommentsService {
                 .content(c.getContent())
                 .likesCount(c.getLikesCount())
                 .repliesCount(c.getRepliesCount())
-                .likedByCurrentUser(likesService.isLiked(c.getUserId(), c.getPostId())) // integrate likes service later
+                .likedByCurrentUser(likesService.isLiked(userId, c.getId()))
                 .isOwner(userId!=null && userId.equals(c.getUserId()))
                 .createdAt(c.getCreatedAt())
                 .build();
