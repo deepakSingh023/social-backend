@@ -7,6 +7,8 @@ import com.example.social_interest.entity.UserInterest;
 import com.example.social_interest.repository.InterestRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.catalina.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,15 +24,16 @@ public class InterestServiceImpl implements InterestService {
 
     private final InterestRepository interestRepository;
 
+    private static final Logger log = LoggerFactory.getLogger(InterestServiceImpl.class);
+
     @Override
     public void updateInterest(String userId, InterestRequest request) {
+        Set<String> semanticTags = request.getSemanticTags();
 
-
-        Set<String> semanticTags = request.getTags();
         if (semanticTags == null || semanticTags.isEmpty()) {
+            log.warn("No tags found. Exiting interest update.");
             return;
         }
-
 
         UserInterest userInterest = interestRepository
                 .findByUserId(userId)
@@ -41,14 +44,12 @@ public class InterestServiceImpl implements InterestService {
                     return ui;
                 });
 
+
         Instant now = Instant.now();
 
-
         for (String tag : semanticTags) {
-
             InterestScore score = userInterest.getInterests()
                     .getOrDefault(tag, new InterestScore(0.1, now));
-
 
             long hoursPassed = Duration
                     .between(score.getLastUpdated(), now)
@@ -57,9 +58,9 @@ public class InterestServiceImpl implements InterestService {
             double decayFactor = Math.exp(-0.03 * hoursPassed);
             double decayedScore = score.getScore() * decayFactor;
 
+            double boost = boostForEvent(request.getType());
 
-            double boostedScore = decayedScore + boostForEvent(request.getEvent());
-
+            double boostedScore = decayedScore + boost;
 
             boostedScore = Math.max(0.0, Math.min(1.0, boostedScore));
 
@@ -69,10 +70,11 @@ public class InterestServiceImpl implements InterestService {
             userInterest.getInterests().put(tag, score);
         }
 
-
         userInterest.setLastUpdated(now);
+
         interestRepository.save(userInterest);
     }
+
 
     @Override
     public InterestDto getInterest(String userId){

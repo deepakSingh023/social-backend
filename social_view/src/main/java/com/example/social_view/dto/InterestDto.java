@@ -7,7 +7,7 @@ import java.util.Set;
 public record InterestDto(
         String userId,
         String reelId,
-        InterestType type,
+        String type,
         Set<String> semanticTags
 ) {
 }

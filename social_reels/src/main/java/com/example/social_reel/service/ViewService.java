@@ -53,8 +53,11 @@ public class ViewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reel not found");
         }
 
-
-
+        log.info(
+                "reelId={} semanticTags={}",
+                reel.getId(),
+                reel.getSemanticTags()
+        );
 
         double popularity = calculatePopularity(reel);
 

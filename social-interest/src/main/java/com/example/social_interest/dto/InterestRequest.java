@@ -1,6 +1,5 @@
 package com.example.social_interest.dto;
 
-
 import lombok.Data;
 
 import java.util.Set;
@@ -12,7 +11,7 @@ public class InterestRequest {
 
     private String reelId;
 
-    private String event;
+    private String type;
 
-    private Set<String> tags;
+    private Set<String> semanticTags;
 }
