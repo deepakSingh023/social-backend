@@ -35,6 +35,9 @@ public class InterestServiceImpl implements InterestService {
             return;
         }
 
+        long start = System.currentTimeMillis();
+
+
         UserInterest userInterest = interestRepository
                 .findByUserId(userId)
                 .orElseGet(() -> {
@@ -44,6 +47,7 @@ public class InterestServiceImpl implements InterestService {
                     return ui;
                 });
 
+        log.info("time taken to fetch time={}",System.currentTimeMillis()-start);
 
         Instant now = Instant.now();
 
@@ -72,7 +76,11 @@ public class InterestServiceImpl implements InterestService {
 
         userInterest.setLastUpdated(now);
 
+        long begin = System.currentTimeMillis();
+
         interestRepository.save(userInterest);
+
+        log.info("time taken to save time = {}",System.currentTimeMillis()-begin);
     }
 
 

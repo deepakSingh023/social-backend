@@ -12,7 +12,7 @@ import java.util.List;
 @FeignClient(name="interaction", url="${interaction.uri}")
 public interface InteractionClient {
 
-    @GetMapping("/api/interaction/getInteractions")
+    @GetMapping("/api/interactions/getInteractions")
     RecipientPage getInteractionIds(@RequestParam String userId,
                                     @RequestParam(required = false) String cursor,
                                     @RequestParam int size,

@@ -303,7 +303,7 @@ public class PostServiceImpl implements PostService {
 
         List<Post> posts;
 
-        if (cursor == null) {
+        if (cursor == null || cursor.isEmpty()) {
             posts = postRepository.findByUserIdOrderByCreatedAtDescIdDesc(
                     authorId,
                     PageRequest.of(0, size)
@@ -327,7 +327,7 @@ public class PostServiceImpl implements PostService {
 
         String nextCursor = null;
 
-        if (!posts.isEmpty()) {
+        if (posts.size() == size) {
             Post last = posts.get(posts.size() - 1);
             nextCursor = last.getCreatedAt() + "|" + last.getId();
         }

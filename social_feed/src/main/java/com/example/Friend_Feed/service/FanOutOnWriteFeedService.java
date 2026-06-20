@@ -1,6 +1,7 @@
 package com.example.Friend_Feed.service;
 
 
+import com.example.Friend_Feed.aspect.LogAspect;
 import com.example.Friend_Feed.dto.CreateFeed;
 import com.example.Friend_Feed.dto.InteractionDto;
 import com.example.Friend_Feed.dto.RecipientPage;
@@ -10,6 +11,8 @@ import com.example.Friend_Feed.repository.FeedRepository;
 import com.example.Friend_Feed.utils.InteractionClient;
 import com.example.Friend_Feed.utils.PostClient;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -33,6 +36,8 @@ public class FanOutOnWriteFeedService {
 
     private final FeedDataFetch feedDataFetch;
 
+    public static final Logger log  = LoggerFactory.getLogger(FanOutOnWriteFeedService.class);
+
     @Value("${service.secret}")
     private String token;
 
@@ -50,9 +55,17 @@ public class FanOutOnWriteFeedService {
 
         do{
 
+            log.info(
+                    "Fetching followers author={} cursor={}",
+                    authorId,
+                    cursor
+            );
+
             RecipientPage page =  feedDataFetch.getInteractionData(data.userId(),cursor,size,token);
 
             List<Feed> feeds = new ArrayList<>();
+
+
 
             for (String recipientId : page.userIds()) {
                 Feed feed = Feed.builder()

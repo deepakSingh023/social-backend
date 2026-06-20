@@ -22,40 +22,55 @@ public class FeedInteractionFetch {
 
     private final FeedRepository feedRepository;
 
-    public RecipientPage getInteractions(String userId, int size ,String cursor){
+    public RecipientPage getInteractions(String userId, int size, String cursor) {
 
-            List<Feed> feeds = new ArrayList<>();
+        List<Feed> feeds;
 
+        if (cursor == null || cursor.isEmpty()) {
 
-        if(cursor != null && !cursor.isEmpty()){
-            feeds = feedRepository.findTop100ByAuthorIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0,size));
+            feeds = feedRepository
+                    .findTop100ByAuthorIdOrderByCreatedAtDescIdDesc(
+                            userId,
+                            PageRequest.of(0, size)
+                    );
 
+        } else {
 
-        }else{
             String[] parts = cursor.split("\\|");
+
             Instant cursorCreatedAt = Instant.parse(parts[0]);
             String cursorId = parts[1];
 
-            feeds = feedRepository.getFeedForUsers(userId,cursorCreatedAt,cursorId,PageRequest.of(0,size));
-
+            feeds = feedRepository.getFeedForUsers(
+                    userId,
+                    cursorCreatedAt,
+                    cursorId,
+                    PageRequest.of(0, size)
+            );
         }
 
         List<String> userIds = feeds.stream()
                 .map(Feed::getRecipientUserId)
                 .toList();
 
-        Feed last = feeds.get(feeds.size()-1);
+        if (feeds.isEmpty()) {
+            return new RecipientPage(
+                    userIds,
+                    null
+            );
+        }
 
+        String nextCursor = null;
 
+        if (feeds.size() == size) {
+            Feed last = feeds.get(feeds.size() - 1);
 
-        RecipientPage data = new RecipientPage(
+            nextCursor = last.getCreatedAt() + "|" + last.getId();
+        }
+
+        return new RecipientPage(
                 userIds,
-                last.getCreatedAt() + "|" + last.getId()
+                nextCursor
         );
-
-
-        return data;
-
-
     }
 }
