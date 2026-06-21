@@ -11,6 +11,7 @@ import com.example.Friend_Feed.repository.FeedRepository;
 import com.example.Friend_Feed.utils.LikesClient;
 import com.example.Friend_Feed.utils.PostClient;
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,6 +62,11 @@ public class PostServiceImpl implements PostService {
 
         log.info("service reached");
 
+        log.info(
+                "REQUEST cursor={} cursorId={}",
+                cursor,
+                cursorId
+        );
 
         List<Feed> feeds;
 
@@ -72,13 +78,29 @@ public class PostServiceImpl implements PostService {
 
             Instant convertedCursor = Instant.parse(cursor);
 
+            ObjectId cursorObjectId = new ObjectId(cursorId);
+
             feeds = feedRepository.getFeed(
                     userId,
                     convertedCursor,
-                    cursorId,
+                    cursorObjectId,
                     PageRequest.of(0,INT_SIZE+1)
             );
         }
+
+
+        feeds.forEach(f ->
+                log.info(
+                        "id={} createdAt={}",
+                        f.getId(),
+                        f.getCreatedAt()
+                )
+        );
+
+        log.info(
+                "Mongo returned {} feeds",
+                feeds.size()
+        );
 
         log.info("feed foud");
 
@@ -93,12 +115,29 @@ public class PostServiceImpl implements PostService {
                 .map(Feed::getPostId)
                 .toList();
 
+        log.info("========== FEED ORDER ==========");
+
+        feeds.forEach(f ->
+                log.info(
+                        "feed postId={} createdAt={} author={}",
+                        f.getPostId(),
+                        f.getCreatedAt(),
+                        f.getAuthorId()
+                )
+        );
 
         List<Post> posts = postClient.getFeedPosts(token,postIds);
 
+        log.info("========== POST ORDER ==========");
 
-
-
+        posts.forEach(p ->
+                log.info(
+                        "postId={} createdAt={} userId={}",
+                        p.getId(),
+                        p.getCreatedAt(),
+                        p.getUserId()
+                )
+        );
 
         Map<String,Boolean> likes = Collections.emptyMap();
 
@@ -139,6 +178,14 @@ public class PostServiceImpl implements PostService {
         Feed last = feeds.get(feeds.size() - 1);
 
         log.info("respnse send serice");
+
+        log.info(
+                "Returning cursor={} cursorId={} hasMore={} feedCount={}",
+                last.getCreatedAt(),
+                last.getId(),
+                hasMore,
+                feeds.size()
+        );
 
         return new FeedResponse(
                 res,

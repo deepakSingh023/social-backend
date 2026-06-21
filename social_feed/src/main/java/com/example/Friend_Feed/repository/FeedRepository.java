@@ -1,6 +1,7 @@
 package com.example.Friend_Feed.repository;
 
 import com.example.Friend_Feed.entity.Feed;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -26,6 +27,6 @@ public interface FeedRepository extends MongoRepository<Feed,String> {
             sort = "{ 'createdAt': -1, '_id': -1 }")
    List<Feed> getFeed(String ownerId,
                       Instant cursor,
-                      String cursorId,
+                      ObjectId cursorId,
                       Pageable pageable);
 }

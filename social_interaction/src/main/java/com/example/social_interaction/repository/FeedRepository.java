@@ -11,7 +11,7 @@ import java.util.Optional;
 
 public interface FeedRepository extends MongoRepository<Feed, String> {
 
-    boolean existsByAuthorIdOrRecipientUserId(String authorId, String recipientUserId);
+    boolean existsByAuthorIdAndRecipientUserId(String authorId, String recipientUserId);
 
     Optional<Feed> findByAuthorIdAndRecipientUserId(String authorId, String recipientUserId);
 

@@ -1,11 +1,14 @@
 package com.example.social_interaction.service;
 
+import com.example.social_interaction.aspect.LogAspect;
 import com.example.social_interaction.entity.Feed;
 import com.example.social_interaction.repository.FeedRepository;
 import com.example.social_interaction.repository.FriendRepository;
 import com.example.social_interaction.repository.RelationRepository;
 import com.example.social_interaction.tasks.PostClient;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -27,6 +30,9 @@ public class InteractonService {
 
     private final RelationRepository relationRepository;
 
+    private static final Logger log = LoggerFactory.getLogger(InteractonService.class);
+
+
     private final PostClient postClient;
 
 
@@ -38,7 +44,13 @@ public class InteractonService {
     @Async
     public void createInteraction(String authorId, String recipientId){
 
-        if(feedRepository.existsByAuthorIdOrRecipientUserId(authorId,recipientId)){
+        boolean exists =
+                feedRepository.existsByAuthorIdAndRecipientUserId(
+                        authorId,
+                        recipientId
+                );
+
+        if(exists){
             return;
         }
 
@@ -48,8 +60,18 @@ public class InteractonService {
                 .createdAt(Instant.now())
                 .build();
 
+        log.info(
+                "Creating interaction author={} recipient={}",
+                authorId,
+                recipientId
+        );
 
-        feedRepository.save(feed);
+        Feed saved = feedRepository.save(feed);
+
+        log.info(
+                "Interaction saved id={}",
+                saved.getId()
+        );
     }
 
     @Async

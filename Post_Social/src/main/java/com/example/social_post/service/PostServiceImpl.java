@@ -21,11 +21,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -143,16 +141,18 @@ public class PostServiceImpl implements PostService {
                 .createdAt(Instant.now())
                 .build();
 
+        Post savedPost = postRepository.save(post);
+
         CreateFeed data = new CreateFeed(
                 userId,
-                post.getId()
+                savedPost.getId()
         );
 
         feedAsyncService.createFeed(data,token);
 
         profileClient.updatePostCounter(token,new ReelUpdate(userId,+1));
 
-        return postRepository.save(post);
+        return savedPost;
     }
 
     @Override
@@ -294,7 +294,20 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public List<Post> getPosts(List<String> postIds){
-        return postRepository.findAllById(postIds);
+
+        List<Post> posts = postRepository.findAllById(postIds);
+
+        Map<String, Post> postMap =
+                posts.stream()
+                        .collect(Collectors.toMap(
+                                Post::getId,
+                                Function.identity()
+                        ));
+
+        return postIds.stream()
+                .map(postMap::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
 
