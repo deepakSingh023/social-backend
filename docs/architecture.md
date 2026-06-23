@@ -1,6 +1,6 @@
 # System Architecture
 
-The Social Media Backend is a distributed social networking platform
+The Social Media Backend is a distributed social media platform
 designed to support posts, reels, personalized feeds, user interactions,
 and real-time messaging.
 
@@ -11,6 +11,10 @@ approach enables separation of concerns and independent scalability.
 The architecture emphasizes feed generation, recommendation systems,
 and real-time communication while maintaining resilience against
 partial service failures.
+
+The platform uses a hybrid feed architecture where post feeds are generated using a fan-out-on-write strategy, while reel recommendations are generated on read using interest-based ranking and popularity scoring.
+
+Real-time messaging is implemented using WebSockets, with Redis Pub/Sub enabling communication across multiple chat service instances.
 
 
 ## System Goals
@@ -76,20 +80,33 @@ Certain orchestration services such as View Service and Reel Fetch Service do no
 
 ## Technology Stack
 
-The platform is implemented using Java and Spring Boot microservices. MongoDB and Postgres from supabase is used as the primary persistence layer for domain-specific data storage while cloudflare R2 is used for storage of static data such as posts, reels, profile images, etc. Redis Pub/Sub enables cross-instance communication for horizontally scalable real-time chat functionality. Docker and Docker Compose are used to simplify deployment and local development by providing a reproducible execution environment.
+The platform is implemented using Java and Spring Boot microservices. MongoDB and PostgreSQL serve as the primary persistence layers, with Supabase providing managed PostgreSQL infrastructure. Cloudflare R2 is used for object storage of static assets such as posts, reels, and profile images. Redis Pub/Sub enables cross-instance communication for horizontally scalable real-time chat functionality. Docker and Docker Compose provide a reproducible deployment environment for local development and testing.
 
-| Category                | Technology                      |
-| ----------------------- |---------------------------------|
-| Language                | Java 17                         |
-| Framework               | Spring Boot                     |
-| Database                | MongoDB , Postgres , Cloudflare |
-| Authentication          | JWT                             |
-| Service Communication   | REST / OpenFeign                |
-| Real-Time Communication | WebSocket                       |
-| Messaging               | Redis Pub/Sub                   |
-| Containerization        | Docker                          |
-| Orchestration           | Docker Compose                  |
-| Build Tool              | Maven                           |
+| Category                | Technology           |
+|-------------------------|----------------------|
+| Language                | Java 17              |
+| Framework               | Spring Boot          |
+| Database                | MongoDB / Postgres   |
+| Object Storage          | Cloudflare R2        |
+| Authentication          | JWT                  |
+| Service Communication   | REST / OpenFeign     |
+| Real-Time Communication | WebSocket            |
+| Messaging               | Redis Pub/Sub        |
+| Containerization        | Docker               |
+| Orchestration           | Docker Compose       |
+| Build Tool              | Maven                |
+| Resilience              | resilience4j         |
+| Logging                 | SLF4J                |
+| Metrics                 | Micrometer           |
+| Monitoring              | Spring Boot Actuator |
+
+## Architectural Highlights
+
+- Fan-out-on-write feed generation
+- Interest-driven reel recommendation pipeline
+- Redis Pub/Sub based chat scaling
+- Database-per-service ownership model
+
 
 ## Conclusion
 
