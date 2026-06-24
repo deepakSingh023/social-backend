@@ -107,7 +107,7 @@ This ensures users always have a valid conversation before message exchange begi
 
 When a user opens the chat interface:
 
-1. Client requests a conversation identifier.
+1. Client requests a conversation identifier using the recipient user ID.
 2. Chat Service locates the conversation using both participant IDs.
 3. Conversation ID is returned.
 4. Client loads historical messages using the conversation ID.
@@ -115,11 +115,13 @@ When a user opens the chat interface:
 
 The conversation ID acts as the primary identifier for all chat operations.
 
+The frontend never sends messages directly using recipient identifiers. Instead, messages are associated with a conversation identifier generated during conversation creation. This allows message persistence, retrieval, and pagination to be performed efficiently using a single conversation key.
+
 ---
 
 ## Message Model
 
-Messages are stored independently from conversations.
+Messages are stored independently from conversations and reference conversations through the conversationId field.
 
 Example:
 
@@ -152,7 +154,7 @@ Messages belong to conversations and are retrieved through conversation-based qu
 When a user sends a message:
 
 1. Client publishes a STOMP message.
-2. Chat Service validates the conversation.
+2. Chat Service receives the message request.
 3. Message is persisted in MongoDB.
 4. Message event is published to Redis.
 5. Redis distributes the event across subscribed instances.
@@ -168,6 +170,8 @@ This workflow ensures message delivery regardless of which chat service instance
 ![Media Message Workflow](images/chat-media-flow.png)
 
 Media messages follow a different workflow than text messages.
+
+Media files are not transferred through WebSocket connections. Only the resulting Cloudflare R2 URL is transmitted through STOMP after successful upload.
 
 Workflow:
 
@@ -256,6 +260,7 @@ Limitations:
 * No distributed presence tracking
 * Message ordering relies on persistence timestamps
 * Limited advanced messaging features
+* Conversations currently support only two participants
 
 ---
 
