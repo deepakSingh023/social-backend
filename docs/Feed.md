@@ -71,7 +71,8 @@ When a user requests a feed:
 1. Feed Service retrieves feed entries for the user.
 2. Associated post identifiers are collected.
 3. Post Service is queried for post content.
-4. Feed entries are assembled and returned to the client.
+4. Feed entries are assembled and Likes are fetched from the Likes service.
+5. Feed is returned to the user.
 
 This design keeps retrieval operations lightweight because feed construction has already occurred during post creation.
 
