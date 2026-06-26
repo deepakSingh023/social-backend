@@ -16,8 +16,8 @@ services:
 
 
 
-  profile-service:   # 👈 clean name used for networking
-    build: ./Profile_social-   # 👈 your actual folder name
+  profile-service:   
+    build: ./Profile_social-   
     container_name: profile-service
     ports:
       - "8081:8081"
