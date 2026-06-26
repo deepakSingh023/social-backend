@@ -87,9 +87,6 @@ Public endpoints include:
 
 * User registration
 * User login
-* Profile fetch
-* Posts fetch
-* Reels fetch
 
 Protected endpoints require successful authentication before processing.
 

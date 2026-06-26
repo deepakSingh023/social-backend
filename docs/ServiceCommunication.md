@@ -185,6 +185,30 @@ A single engagement event therefore contributes to both recommendation ranking a
 
 ---
 
+## Fault Tolerance
+
+The platform uses Resilience4j to improve the reliability of inter-service communication.
+
+![retry-mechanism(1).png](images/retry-mechanism%281%29.png)
+
+Retry and Circuit Breaker patterns are applied to both synchronous and asynchronous service calls depending on the criticality of the workflow.
+
+Typical use cases include:
+
+* Automatic profile creation after user registration
+* Feed generation after post creation
+* Feed generation after new social interactions
+* Conversation creation and deletion
+* Profile denormalization
+* Feed retrieval from dependent services
+* Cleanup of likes and comments during content deletion
+
+For asynchronous background operations, retries are attempted before the Circuit Breaker invokes a fallback method that records the failure for monitoring.
+
+For synchronous retrieval operations, fallback methods return safe default responses when dependent services are unavailable. This prevents cascading failures while allowing the requesting service to degrade gracefully.
+
+---
+
 ## Eventual Consistency
 
 The platform intentionally adopts eventual consistency for background operations.
@@ -204,14 +228,12 @@ This approach reduces request latency while maintaining acceptable consistency f
 
 ## Failure Handling
 
-The communication model isolates failures whenever possible.
+The communication model is designed to isolate failures while preventing them from unnecessarily affecting independent services.
 
-If an asynchronous background operation fails:
+For asynchronous background operations, transient failures are automatically retried using Resilience4j before the configured fallback method is invoked. If all retry attempts are exhausted, the failure is recorded through logging while the original client request remains successful. This allows background tasks such as feed generation, profile creation, conversation creation, and denormalization to fail independently without requiring the user to repeat the initiating action.
 
-* The primary user request has already completed successfully.
-* The affected background task can be retried without requiring the user to repeat the original operation.
+For synchronous operations, dependent service failures are handled according to the requirements of the workflow. Requests that require data to maintain consistency, such as post or reel creation with profile denormalization, are aborted if the required dependency is unavailable. For retrieval operations where partial responses are acceptable, fallback methods may return safe default responses to degrade gracefully instead of propagating the failure.
 
-For synchronous operations, dependent service failures are propagated immediately to the requesting service because the requested data is required to complete the response.
 
 ---
 
@@ -228,7 +250,9 @@ Advantages:
 Limitations:
 
 * Synchronous operations remain dependent on service availability
-* No centralized message broker
+* No centralized message broker 
+* Fallbacks currently provide logging or simplified responses rather than recovery workflows 
+* No centralized retry queue
 * No distributed transaction management
 * Background tasks are processed within service instances
 
@@ -253,4 +277,4 @@ The communication architecture combines synchronous REST communication with asyn
 
 Critical request-response operations complete synchronously, while non-essential side effects execute asynchronously to reduce latency. This hybrid approach keeps services loosely coupled, supports independent deployment, and provides a practical communication model for a distributed social media backend while remaining extensible for future event-driven enhancements.
 
-Critical synchronous communication is protected using resilience mechanisms described in Resilience.md.
+Critical service-to-service communication is further protected using retry and circuit breaker mechanisms implemented with Resilience4j.
