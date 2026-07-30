@@ -1,5 +1,6 @@
 package com.example.Social.profile.config;
 
+import com.example.Social.profile.filter.GateWayHeaderFilter;
 import com.example.Social.profile.filter.InternalFilter;
 import com.example.Social.profile.utils.JwtUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +30,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, InternalFilter internalFilter) throws Exception {
+    public GateWayHeaderFilter gateWayHeaderFilter(@Value("${app.gateway.secret}")String expectedSecret){
+        return new GateWayHeaderFilter(expectedSecret);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, InternalFilter internalFilter, GateWayHeaderFilter gateWayHeaderFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -39,6 +45,7 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 );
 
+        http.addFilterBefore(gateWayHeaderFilter,UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class);
 
 

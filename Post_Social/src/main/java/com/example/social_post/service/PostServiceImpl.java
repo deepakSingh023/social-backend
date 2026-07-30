@@ -243,8 +243,13 @@ public class PostServiceImpl implements PostService {
                 ? null
                 : posts.get(posts.size() - 1).getCreatedAt();
 
-        //  isOwner (same for all posts)
-        boolean isOwner = viewerUserId != null && viewerUserId.equals(profileUserId);
+        boolean isOwner = false;
+
+       if (viewerUserId != null){
+           isOwner = viewerUserId != null && viewerUserId.equals(profileUserId);
+
+       }
+        
 
         // collect postIds
         List<String> postIds = posts.stream()
@@ -354,17 +359,24 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(()-> new PostNotFound("this post does not exist"));
 
-
-        boolean isOwner = post.getUserId().equals(userId);
-
         boolean isLiked = false;
+        boolean isOwner = false;
 
-        try{
-            isLiked = likeClient.getIndividualLiked(token, userId, postId);
 
-        }catch (Exception e){
-            log.error("likes service is down or not responding",e);
+        if(userId != null){
+             isOwner = post.getUserId().equals(userId);
+
+
+            try{
+                isLiked = likeClient.getIndividualLiked(token, userId, postId);
+
+            }catch (Exception e){
+                log.error("likes service is down or not responding",e);
+            }
         }
+
+
+
 
         PostResponseDto res = new PostResponseDto(
                 post.getId(),

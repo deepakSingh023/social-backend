@@ -4,16 +4,16 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
-@Component
+@RequiredArgsConstructor
 public class GateWayHeaderFilter extends OncePerRequestFilter {
 
-    @Value("${app.gateway.secret}")
-    private String expectedSecret;
+    private final String expectedSecret;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
