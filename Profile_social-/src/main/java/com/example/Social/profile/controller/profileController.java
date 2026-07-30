@@ -44,9 +44,8 @@ public class profileController {
 
     @PostMapping("/upload-url")
     public UploadResponse getUploadUrl(@RequestBody UploadRequest req,
-                                       Authentication authentication) {
+                                       @RequestHeader("X-User-Id") String userId) {
 
-        String userId = authentication.getName();
 
         if (req.contentType() == null ||
                 (!req.contentType().startsWith("image/") && !req.contentType().startsWith("video/"))) {
@@ -70,10 +69,9 @@ public class profileController {
     @PostMapping("/avatar")
     public ResponseEntity<Void> updateAvatar(
             @RequestBody UpdateAvatarRequest request,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
 
-        String userId = authentication.getName();
 
         profileService.updateAvatar(
                 userId,
@@ -88,10 +86,9 @@ public class profileController {
     public ResponseEntity<?> updateProfile(
             @RequestPart("data") updateProfile request,
             @RequestPart(value = "profilePic", required = false) MultipartFile profilePic,
-            Authentication auth
+            @RequestHeader("X-User-Id") String userId
     ) {
 
-        String userId = auth.getName();
         profile profile = profileService.updateProfile(userId, request, profilePic);
         return ResponseEntity.ok(profile);
     }
@@ -101,10 +98,9 @@ public class profileController {
 
     @PostMapping("/fetch-profile")
     public ResponseEntity<fetchProfile> fetch(
-            Authentication auth
+            @RequestHeader("X-User-Id") String userId
     ){
 
-        String userId = auth.getName();
 
         fetchProfile data = profileService.getProfile(userId);
 
@@ -115,9 +111,9 @@ public class profileController {
     @GetMapping("/fetch-profile-else/{otherUserId}")
     public ResponseEntity<FetchSomeoneProfile> fetchElse(
             @PathVariable String otherUserId,
-            Authentication auth
+            @RequestHeader("X-User-Id") String userId
     ){
-        FetchSomeoneProfile res = profileService.fetchSomeoneElseProfile(auth.getName(), otherUserId);
+        FetchSomeoneProfile res = profileService.fetchSomeoneElseProfile(userId, otherUserId);
 
         return ResponseEntity.ok(res);
     }
