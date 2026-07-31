@@ -20,44 +20,39 @@ public class MetricAspect {
     private final MeterRegistry meterRegistry;
 
 
-    @Around("execution(* com.example.social_interest.controller..*(..))")
-    public Object getMetrics(ProceedingJoinPoint jp)throws Throwable{
-
-        String method = jp.getSignature().getName();
+    @Around("execution(* com.example.social_interest.service..*(..))")
+    public Object getMetrics(ProceedingJoinPoint jp) throws Throwable {
 
         String controller = jp.getSignature().getDeclaringType().getSimpleName();
+        String method = jp.getSignature().getName();
 
+        // Start stopwatch using Micrometer's standard clock
         Timer.Sample sample = Timer.start(meterRegistry);
+        String status = "success";
 
         try {
-            Object result = jp.proceed();
-
+            return jp.proceed();
+        } catch (Throwable ex) { // Catch Throwable to match Spring AOP proceed signature
+            status = "error";
+            throw ex;
+        } finally {
+            // This blocks guarantees the timer stops even if things crash!
             sample.stop(
                     Timer.builder("http.api.latency")
-                            .tag("api",method)
-                            .tag("controller",controller)
-                            .tag("status","success")
-                            .publishPercentiles(0.5,0.95,0.99)
+                            .tag("controller", controller)
+                            .tag("method", method)
+                            .tag("status", status)
+                            .publishPercentiles(0.5, 0.95, 0.99)
                             .publishPercentileHistogram()
                             .register(meterRegistry)
             );
 
-            meterRegistry.counter("http.api.counter",
-                    "api",method,
-                    "controller",controller,
-                    "status","success").increment();
-
-            return result;
-
-        }catch (Exception ex){
-
-            meterRegistry.counter("http.api.counter",
-                    "api",method,
-                    "controller",controller,
-                    "status","error").increment();
-
-            throw ex;
-
+            meterRegistry.counter(
+                    "http.api.count",
+                    "controller", controller,
+                    "method", method,
+                    "status", status
+            ).increment();
         }
     }
 }

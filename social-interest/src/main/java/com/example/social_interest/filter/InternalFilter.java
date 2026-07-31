@@ -1,6 +1,4 @@
 package com.example.social_interest.filter;
-
-import com.example.social_interest.aspect.LogAspect;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
