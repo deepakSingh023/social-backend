@@ -1,6 +1,7 @@
 package com.example.social_fetchReels.config;
 
-import com.example.social_fetchReels.filter.JwtAuthenticationFilter;
+import com.example.social_fetchReels.filter.GatewayHeaderFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -18,8 +19,13 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthenticationFilter jwtFilter) throws Exception {
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}")String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,GatewayHeaderFilter gatewayHeaderFilter
+                                                   ) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -30,7 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(gatewayHeaderFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
