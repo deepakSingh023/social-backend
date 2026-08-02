@@ -10,10 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -40,12 +37,10 @@ public class ChatController {
     @GetMapping("/get-convoId")
     public ResponseEntity<String> getConversation(
             @RequestParam String receiverId,
-            Authentication auth
+            @RequestHeader("X-User-Id") String userId
     ){
 
-        String senderId= auth.getName();
-        
-        String conversationId = conversationService.getConvId(senderId,receiverId);
+        String conversationId = conversationService.getConvId(userId,receiverId);
 
         return ResponseEntity.ok().body(conversationId);
     }

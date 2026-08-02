@@ -17,9 +17,8 @@ public class ReelController {
     public FeedResponse getFeed(
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "10") int limit,
-            Authentication authentication) {
+            @RequestHeader("X-User-Id") String userId) {
 
-        String userId = authentication.getName();
         int safeLimit = limit > 0 ? limit : 10;
 
         return reelService.getFeed(userId, cursor, safeLimit);

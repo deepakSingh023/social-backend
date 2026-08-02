@@ -22,18 +22,17 @@ public class LikesController {
     @PostMapping("/like/create")
     public ResponseEntity<LikeResponseDTO> like(
             @RequestBody LikeRequestDTO request,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = SecurityUtil.getCurrentUserId(authentication);
         return ResponseEntity.ok(likesService.createLike(request, userId));
     }
 
     @DeleteMapping("/like/unlike")
     public ResponseEntity<LikeResponseDTO> unlike(
             @RequestBody LikeRequestDTO request,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = SecurityUtil.getCurrentUserId(authentication);
+
         return ResponseEntity.ok(likesService.removeLike(request, userId));
     }
 

@@ -25,9 +25,8 @@ public class CommentController {
     @PostMapping("/comment")
     public ResponseEntity<CommentResponseDTO> create(
             @RequestBody CreateCommentDTO data,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getName();
         return ResponseEntity.ok(commentsService.createComment(data, userId));
     }
 
@@ -35,9 +34,8 @@ public class CommentController {
     @DeleteMapping("/delete/{commentId}")
     public ResponseEntity<Void> delete(
             @PathVariable String commentId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getName();
         commentsService.deleteComment(commentId, userId);
         return ResponseEntity.noContent().build();
     }
@@ -47,10 +45,8 @@ public class CommentController {
     public ResponseEntity<List<CommentResponseDTO>> getPostComments(
             @PathVariable String postId,
             @RequestParam String cursor,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-
-        String userId = authentication.getName();
 
         return ResponseEntity.ok(
                 commentsService.getCommentsByPost(postId,userId,cursor)
@@ -62,10 +58,9 @@ public class CommentController {
     public ResponseEntity<List<CommentResponseDTO>> getReplies(
             @PathVariable String parentCommentId,
             @RequestParam String cursor,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
 
-        String userId = authentication.getName();
         return ResponseEntity.ok(
                 commentsService.getReplies(parentCommentId,userId,cursor)
         );

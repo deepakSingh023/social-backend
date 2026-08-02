@@ -30,11 +30,10 @@ public class PostController {
 
     @PostMapping(value = "/create", consumes = {"multipart/form-data"})
     public ResponseEntity<Post> createPost(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @ModelAttribute PostCreation postCreation
     ) throws Exception {
 
-        String userId = authentication.getName();
         Post post = postService.createPost(userId, postCreation);
 
         return ResponseEntity.ok(post);
@@ -47,12 +46,9 @@ public class PostController {
 
     @PostMapping("/frontend-upload/create")
     public ResponseEntity<Post> createPostNew(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestBody CreatePost createPost
     ){
-
-        String userId = authentication.getName();
-
         Post post = postService.newCreateApi(userId,createPost);
 
         return  ResponseEntity.ok(post);
@@ -63,11 +59,10 @@ public class PostController {
 
     @DeleteMapping("/delete/{postId}")
     public ResponseEntity<String> deletePost(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @PathVariable String postId
     ) {
 
-        String userId = authentication.getName(); // owner check
         postService.deletePost(userId, postId);
 
         return ResponseEntity.ok("Post deleted successfully");
@@ -78,9 +73,8 @@ public class PostController {
     public ResponseEntity<PersonalPosts> getUserPosts(
             @PathVariable String userId,
             @RequestParam(required = false) String cursor,
-            Authentication authentication) {
+            @RequestHeader("X-User-Id") String viewerUserId) {
 
-        String viewerUserId = authentication != null ? authentication.getName() : null;
 
         PersonalPosts response = postService.getPostsByUserId(userId, viewerUserId, cursor);
 
@@ -90,9 +84,8 @@ public class PostController {
     @GetMapping("/users/posts/{postId}")
     public ResponseEntity<IndividualResponse> getIndividualPost(
             @PathVariable String postId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getName();
         IndividualResponse res = postService.getIndividualPost(postId, userId);
         return ResponseEntity.ok(res);
     }
@@ -100,9 +93,8 @@ public class PostController {
 
     @PostMapping("/upload-url")
     public UploadResponse getUploadUrl(@RequestBody UploadRequest req,
-                                       Authentication authentication) {
+                                       @RequestHeader("X-User-Id") String userId) {
 
-        String userId = authentication.getName();
 
         if (req.contentType() == null ||
                 (!req.contentType().startsWith("image/") && !req.contentType().startsWith("video/"))) {

@@ -18,7 +18,7 @@ public class MetricAspect {
 
     private final MeterRegistry meterRegistry;
 
-    @Around("execution(* com.example.social_fetchReels.controller..*(..))")
+    @Around("execution(* com.example.social_fetchReels.service..*(..))")
     public Object getMetric(ProceedingJoinPoint jp)throws Throwable{
 
         String method = jp.getSignature().getName();

@@ -1,12 +1,11 @@
 package com.example.social_likes.config;
 
+import com.example.social_likes.filter.GatewayHeaderFilter;
 import com.example.social_likes.filter.InternalFilter;
-import com.example.social_likes.filter.JwtAuthenticationFilter;
-import com.example.social_likes.util.JwtUtil;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,11 +22,6 @@ import java.util.List;
 public class SecurityConfig {
 
 
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil){
-        return new JwtAuthenticationFilter(jwtUtil);
-
-    }
 
     @Bean
     public InternalFilter internalFilter( @Value("${service.secret}") String secret){
@@ -37,23 +31,24 @@ public class SecurityConfig {
     }
 
     @Bean
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.gateway.secret}") String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
+
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthenticationFilter jwtFilter,
-                                                   InternalFilter internalFilter) throws Exception {
+                                                   InternalFilter internalFilter, GatewayHeaderFilter gatewayHeaderFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/comments/denormalize/**").permitAll()
-                        .requestMatchers("/api/likes/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .anyRequest().permitAll()
                 )
-                .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
-
+                .addFilterBefore(gatewayHeaderFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class);
 
 
         return http.build();
@@ -64,7 +59,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000")); // ✅ allows all domains
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));

@@ -30,7 +30,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public GateWayHeaderFilter gateWayHeaderFilter(@Value("${app.gateway.secret}")String expectedSecret){
+    public GateWayHeaderFilter gateWayHeaderFilter(@Value("${service.gateway.secret}")String expectedSecret){
         return new GateWayHeaderFilter(expectedSecret);
     }
 

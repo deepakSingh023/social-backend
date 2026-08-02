@@ -1,12 +1,12 @@
 package com.example.social_chat.config;
 
+import com.example.social_chat.Security.GatewayHeaderFilter;
 import com.example.social_chat.Security.InternalFilter;
-import com.example.social_chat.Security.JwtAuthFilter;
-import com.example.social_chat.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -31,13 +31,13 @@ public class SecurityConfig {
         return new InternalFilter(token);
     }
 
-    @Bean
-    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil){
-        return new JwtAuthFilter(jwtUtil);
-    }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http,JwtAuthFilter jwtAuthFilter, InternalFilter internalFilter) throws Exception {
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}")String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
+    }
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,GatewayHeaderFilter gatewayHeaderFilter, InternalFilter internalFilter) throws Exception {
 
         http
                 .cors(Customizer.withDefaults()) // ✅ ENABLE CORS
@@ -47,12 +47,10 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/api/health/**").permitAll()
-                        .requestMatchers("/api/conversation/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .anyRequest().permitAll()
                 )
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(gatewayHeaderFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

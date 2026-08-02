@@ -1,5 +1,4 @@
 package com.example.social_chat.utils;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
