@@ -1,7 +1,4 @@
 package com.example.social_view.service;
-
-
-import com.example.social_view.aspect.LogAspect;
 import com.example.social_view.dto.InterestDto;
 import com.example.social_view.dto.ViewDto;
 import com.example.social_view.enums.InterestType;

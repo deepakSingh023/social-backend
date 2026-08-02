@@ -1,12 +1,12 @@
 package com.example.social_view.config;
 
 
+import com.example.social_view.filter.GatewayHeaderFilter;
 import com.example.social_view.filter.InternalFilter;
-import com.example.social_view.filter.JwtAuthenticationFilter;
-import com.example.social_view.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -24,10 +24,9 @@ public class SecurityConfig {
 
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil){
-        return new JwtAuthenticationFilter(jwtUtil);
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}") String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
     }
-
     @Bean
     public InternalFilter internalFilter(@Value("${service.secret}") String token){
         return new InternalFilter(token);
@@ -35,18 +34,16 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthenticationFilter jwtAuthenticationFilter, InternalFilter internalFilter) throws Exception {
+                                                   GatewayHeaderFilter gatewayHeaderFilter, InternalFilter internalFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/view/create-like-interest").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .anyRequest().permitAll()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(gatewayHeaderFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class);
 
 
@@ -60,7 +57,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000","https://post-social-dwlc.onrender.com")); // ✅ allows all domains
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
