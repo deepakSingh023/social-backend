@@ -26,10 +26,8 @@ public class FollowController {
     @PostMapping("/follow")
     public ResponseEntity<Void> follow(
             @RequestBody followRequest request,
-
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         relationService.followRequest(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -40,9 +38,8 @@ public class FollowController {
     @DeleteMapping("/unfollow")
     public ResponseEntity<Void> unfollow(
             @RequestParam String followedId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getName();
         relationService.stopFollowing(userId, followedId);
         return ResponseEntity.noContent().build();
     }
@@ -53,9 +50,8 @@ public class FollowController {
     @DeleteMapping("/followers/{followerId}")
     public ResponseEntity<Void> removeFollower(
             @PathVariable String followerId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         relationService.removeFollower(followerId, userId);
         return ResponseEntity.noContent().build();
     }
@@ -66,9 +62,8 @@ public class FollowController {
     @PostMapping("/follow-requests/{requestId}/accept")
     public ResponseEntity<Void> acceptFollowRequest(
             @PathVariable String requestId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         relationService.acceptFollowRequest(requestId);
         return ResponseEntity.ok().build();
     }
@@ -79,9 +74,8 @@ public class FollowController {
     @DeleteMapping("/follow-requests/{requestId}")
     public ResponseEntity<Void> rejectFollowRequest(
             @PathVariable String requestId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         relationService.rejectFollowRequest(requestId);
         return ResponseEntity.noContent().build();
     }
@@ -91,10 +85,9 @@ public class FollowController {
      */
     @GetMapping("/me/followers")
     public ResponseEntity<Page<Follower>> getMyFollowers(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             Pageable pageable
     ) {
-        String userId = authentication.getPrincipal().toString();
         return ResponseEntity.ok(
                 relationService.getFollowers(userId, pageable)
         );
@@ -105,10 +98,9 @@ public class FollowController {
      */
     @GetMapping("/me/following")
     public ResponseEntity<Page<Follower>> getMyFollowing(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             Pageable pageable
     ) {
-        String userId = authentication.getPrincipal().toString();
         return ResponseEntity.ok(
                 relationService.getFollowing(userId, pageable)
         );
@@ -119,10 +111,9 @@ public class FollowController {
      */
     @GetMapping("/me/follow-requests")
     public ResponseEntity<Page<FollowRequest>> getMyFollowRequests(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             Pageable pageable
     ) {
-        String userId = authentication.getPrincipal().toString();
         return ResponseEntity.ok(
                 relationService.getFollowRequests(userId, pageable)
         );

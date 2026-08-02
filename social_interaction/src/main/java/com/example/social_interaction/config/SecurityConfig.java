@@ -1,6 +1,5 @@
 package com.example.social_interaction.config;
 
-import com.example.social_interaction.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,8 +18,8 @@ public class SecurityConfig {
 
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil){
-        return new JwtAuthenticationFilter(jwtUtil);
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}")String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
     }
 
     @Bean
@@ -31,23 +30,17 @@ public class SecurityConfig {
 
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter, InternalFilter internalFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, GatewayHeaderFilter gatewayHeaderFilter, InternalFilter internalFilter) throws Exception {
 
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/api/interaction/denormalize").permitAll()
-                        .requestMatchers("/api/interactions/getInteractions").permitAll()
-                        .requestMatchers("/api/interaction/check").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(gatewayHeaderFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -56,7 +49,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-                "http://localhost:3000","https://social-interaction-by8w.onrender.com"
+                "http://localhost:3000"
         ));
         config.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS"

@@ -26,15 +26,12 @@ public class SearchController {
 
     @GetMapping("/friend")
     public ResponseEntity<SearchRequest> search(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) String query
     ){
 
-        String userId = authentication.getName();
-
         return ResponseEntity.ok(
-
                 friendService.searchFriends(userId,cursor,query)
         );
 
@@ -43,13 +40,11 @@ public class SearchController {
 
     @GetMapping("/followers")
     public ResponseEntity<FollowResult> getConnections(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam FollowerType type,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String cursor
     ) {
-
-        String userId = authentication.getName();
 
         return ResponseEntity.ok(
                 followService.searchConnections(

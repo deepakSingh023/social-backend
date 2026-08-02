@@ -1,9 +1,8 @@
 package com.example.Friend_Feed.config;
 
 
+import com.example.Friend_Feed.filter.GatewayHeaderFilter;
 import com.example.Friend_Feed.filter.InternalFilter;
-import com.example.Friend_Feed.filter.JwtAuthenticationFilter;
-import com.example.Friend_Feed.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,8 +24,8 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil){
-        return new JwtAuthenticationFilter(jwtUtil);
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}")String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
     }
 
     @Bean
@@ -35,21 +34,17 @@ public class SecurityConfig {
     }
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthenticationFilter jwtFilter, InternalFilter internalFilter) throws Exception {
+                                                   GatewayHeaderFilter gatewayHeaderFilter, InternalFilter internalFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/feeds/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(internalFilter, JwtAuthenticationFilter.class);
+                .addFilterBefore(gatewayHeaderFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(internalFilter, GatewayHeaderFilter.class);
 
         return http.build();
     }
@@ -59,7 +54,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000","https://post-social-dwlc.onrender.com")); // ✅ allows all domains
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));

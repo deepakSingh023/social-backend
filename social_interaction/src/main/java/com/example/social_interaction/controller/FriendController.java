@@ -29,9 +29,8 @@ public class FriendController {
     @PostMapping("/{receiverId}")
     public ResponseEntity<Void> addFriend(
             @PathVariable String receiverId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String senderId
     ) {
-        String senderId = authentication.getPrincipal().toString();
         friendService.addFriend(senderId, receiverId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -42,21 +41,18 @@ public class FriendController {
     @DeleteMapping("/{friendId}")
     public ResponseEntity<Void> removeFriend(
             @PathVariable String friendId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         friendService.removeFriend(userId, friendId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
     public ResponseEntity<FriendResponse> getMyFriends(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false)
             String cursor
     ) {
-
-        String userId = authentication.getPrincipal().toString();
 
         return ResponseEntity.ok(
                 friendService.getFriends(userId, cursor)
@@ -69,9 +65,8 @@ public class FriendController {
     @PostMapping("/requests/{requestId}/accept")
     public ResponseEntity<Void> acceptFriendRequest(
             @PathVariable String requestId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         friendService.acceptRequest(requestId, userId);
         return ResponseEntity.ok().build();
     }
@@ -82,9 +77,8 @@ public class FriendController {
     @DeleteMapping("/requests/{requestId}")
     public ResponseEntity<Void> rejectFriendRequest(
             @PathVariable String requestId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        String userId = authentication.getPrincipal().toString();
         friendService.rejectRequest(requestId, userId);
         return ResponseEntity.noContent().build();
     }
@@ -94,10 +88,9 @@ public class FriendController {
      */
     @GetMapping("/requests")
     public ResponseEntity<RequestResponse> getMyFriendRequests(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam(required = false) String cursor
     ) {
-        String userId = authentication.getPrincipal().toString();
         return ResponseEntity.ok(
                 friendService.getRequests(userId, cursor)
         );

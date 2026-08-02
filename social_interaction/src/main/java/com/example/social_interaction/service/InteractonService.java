@@ -1,6 +1,4 @@
 package com.example.social_interaction.service;
-
-import com.example.social_interaction.aspect.LogAspect;
 import com.example.social_interaction.entity.Feed;
 import com.example.social_interaction.repository.FeedRepository;
 import com.example.social_interaction.repository.FriendRepository;
