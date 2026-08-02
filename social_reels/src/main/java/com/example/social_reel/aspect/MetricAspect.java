@@ -20,53 +20,41 @@ public class MetricAspect {
 
     private final MeterRegistry meterRegistry;
 
-    @Around("execution(* com.example.social_reel.controller..*(..))")
-    public Object getMetric(ProceedingJoinPoint jp)throws Throwable, IOException{
+    @Around("execution(* com.example.social_reel.service..*(..))")
+    public Object getMetrics(ProceedingJoinPoint jp) throws Throwable {
 
         String method = jp.getSignature().getName();
         String controller = jp.getSignature().getDeclaringType().getSimpleName();
 
+        // 1. Start the micrometer stopwatch
         Timer.Sample sample = Timer.start(meterRegistry);
+        String status = "Success";
 
-        try{
-            Object result = jp.proceed();
+        try {
+            return jp.proceed();
+        } catch (Exception ex) {
+            status = "Error";
+            throw ex;
+        } finally {
 
             sample.stop(
                     Timer.builder("http.api.latency")
-                            .tag("api",method)
-                            .tag("controller",controller)
-                            .tag("status","success")
-                            .publishPercentiles(0.5,0.95,0.99)
+                            .tag("controller", controller)
+                            .tag("method", method)
+                            .tag("Status", status)
+                            .publishPercentiles(0.5, 0.95, 0.99)
                             .publishPercentileHistogram()
                             .register(meterRegistry)
             );
 
-            meterRegistry.counter("http.api.count",
-                    "api",method,
-                    "controller",controller,
-                    "status","success"
-            ).increment();
-
-            return result;
-        }catch (Exception ex){
 
             meterRegistry.counter("http.api.count",
-                    "api",method,
-                    "controller",controller,
-                    "status","error"
+                    "method", method,
+                    "controller", controller,
+                    "Status", status
             ).increment();
-
-            throw ex;
-
         }
-
-
-
-
     }
-
-
-
 
 
 }

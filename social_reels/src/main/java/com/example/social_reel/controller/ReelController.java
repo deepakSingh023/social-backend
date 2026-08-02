@@ -7,7 +7,7 @@ import com.example.social_reel.service.ReelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,10 +30,9 @@ public class ReelController {
             @RequestPart("video") MultipartFile video,
             @RequestPart("tags") List<String> tags,
             @RequestPart("caption") String caption,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) throws Exception {
 
-        String userId = authentication.getName();
         return ResponseEntity.ok(
                 reelService.createReel(userId, video, tags, caption)
         );
@@ -42,9 +41,9 @@ public class ReelController {
     @DeleteMapping("/{reelId}")
     public ResponseEntity<Void> deleteReel(
             @PathVariable String reelId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
-        reelService.deleteReel(reelId, authentication.getName());
+        reelService.deleteReel(reelId, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -52,10 +51,9 @@ public class ReelController {
     public ResponseEntity<PersonalReels> myReels(
             @PathVariable String postOwnerId,
             @RequestParam(required = false) String cursor,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ) {
 
-        String userId= authentication.getName();
         return ResponseEntity.ok(
                 reelService.getMyReels(userId,postOwnerId,cursor)
         );
@@ -65,9 +63,8 @@ public class ReelController {
     @GetMapping("/users/reels/{reelId}")
     public ResponseEntity<IndividualResponse> getIndividualReel(
             @PathVariable String reelId,
-            Authentication authentication
+            @RequestHeader("X-User-Id") String userId
     ){
-        String userId = authentication.getName();
 
         IndividualResponse res = reelService.getReel(userId,reelId);
 
@@ -77,9 +74,9 @@ public class ReelController {
 
     @PostMapping("/upload-url")
     public UploadResponse getUploadUrl(@RequestBody UploadRequest req,
-                                       Authentication authentication) {
+                                       @RequestHeader("X-User-Id") String userId )
+            {
 
-        String userId = authentication.getName();
 
         if (req.contentType() == null ||
                 (!req.contentType().startsWith("image/") && !req.contentType().startsWith("video/"))) {
@@ -101,11 +98,9 @@ public class ReelController {
 
     @PostMapping("/frontend-upload/create")
     public ResponseEntity<Reel> createPostNew(
-            Authentication authentication,
+            @RequestHeader("X-User-Id") String userId,
             @RequestBody CreateReel createPost
     ){
-
-        String userId = authentication.getName();
 
         Reel post = reelService.newCreateApi(userId,createPost);
 

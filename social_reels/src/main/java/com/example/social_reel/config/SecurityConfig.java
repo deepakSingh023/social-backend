@@ -1,9 +1,9 @@
 package com.example.social_reel.config;
 
+import com.example.social_reel.filters.GatewayHeaderFilter;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfigurationSource;
 import com.example.social_reel.filters.InternalFilter;
-import com.example.social_reel.filters.JwtAuthenticationFilter;
-import com.example.social_reel.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,8 +23,8 @@ public class SecurityConfig {
 
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil){
-        return new JwtAuthenticationFilter(jwtUtil);
+    public GatewayHeaderFilter gatewayHeaderFilter(@Value("${service.secret.gateway}")String gatewaySecret){
+        return new GatewayHeaderFilter(gatewaySecret);
     }
 
     @Bean
@@ -34,19 +34,18 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   JwtAuthenticationFilter jwtFilter ,InternalFilter internalFilter) throws Exception {
+                                                   GatewayHeaderFilter gatewayHeaderFilter,InternalFilter internalFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/reel/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
+                        .anyRequest().permitAll()
                 )
-                .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(gatewayHeaderFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class);
+
 
         return http.build();
     }
@@ -56,7 +55,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000","https://social-reels-dwt4.onrender.com")); // ✅ allows all domains
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
