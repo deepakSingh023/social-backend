@@ -2,18 +2,28 @@ package com.example.Social.profile.service;
 
 
 import com.example.Social.profile.dto.DenormalizeDto;
+import com.example.Social.profile.dto.DenormalizeEvent;
+import com.example.Social.profile.entity.Outbox;
+import com.example.Social.profile.enums.EventStatus;
+import com.example.Social.profile.repository.OutboxRepository;
 import com.example.Social.profile.tasks.CommentsClient;
 import com.example.Social.profile.tasks.InteractionClient;
 import com.example.Social.profile.tasks.PostClient;
 import com.example.Social.profile.tasks.ReelClient;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 
 @RequiredArgsConstructor
@@ -26,31 +36,63 @@ public class DenormalizeService {
 
     private static final Logger log = LoggerFactory.getLogger(DenormalizeService.class);
 
-    @Value("${secret.service}")
-    private String secret;
+    private final KafkaTemplate<String, DenormalizeEvent> kafkaTemplate;
+
+    private final OutboxRepository outboxRepository;
+
+    private final TraceContextService traceContextService;
+
 
     private final DenormalizeWorker worker;
 
-    @Async("denormalize")
-    public void denormalize(DenormalizeDto data){
+    @Scheduled(fixedDelay = 1000)
+    public void kafkaPublisher(){
 
-        try {
-            worker.denormPost(data, secret);
-        } catch (Exception ignored) {}
+        List<Outbox> data = outboxRepository.findTop100ByStatusOrderByCreatedAt(EventStatus.PENDING);
 
-        try {
-            worker.denormReel(data, secret);
-        } catch (Exception ignored) {}
+        for (Outbox event : data) {
 
-        try {
-            worker.denormComment(data, secret);
-        } catch (Exception ignored) {}
+            DenormalizeEvent eve = new DenormalizeEvent(
+                    event.getId(),
+                    event.getAggregateId(),
+                    event.getPayload()
+            );
 
-        try {
-            worker.denormInteraction(data, secret);
-        } catch (Exception ignored) {}
+            try {
+
+                Context context =
+                        traceContextService.restore(
+                                event.getTraceParent()
+                        );
+
+
+                try (Scope ignored = context.makeCurrent()) {
+
+                    kafkaTemplate.send(
+                            event.getTopic(),
+                            event.getAggregateId(),
+                            eve
+                    ).get();
+
+                }
+
+                event.setStatus(EventStatus.SUCCEED);
+
+            } catch (Exception e) {
+
+                event.setRetryCount(event.getRetryCount() + 1);
+
+                log.error("Kafka publish failed id={}",
+                        event.getId(),
+                        e);
+            }
+
+        }
+
+        outboxRepository.saveAll(data);
 
     }
+
 
 
 

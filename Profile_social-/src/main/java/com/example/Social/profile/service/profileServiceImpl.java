@@ -23,6 +23,7 @@ public class profileServiceImpl implements profileService {
     private final ProfileRepository profileRepository;
     private final R2ImageService r2ImageService;
     private final MongoTemplate mongoTemplate;
+    private final DenormalizeWorker denormalizeWorker;
     private final DenormalizeService denormalizeService;
 
     private final InteractionClient interactionClient;
@@ -72,7 +73,7 @@ public class profileServiceImpl implements profileService {
 
         profileRepository.save(profile);
 
-        denormalizeService.denormalize(
+        denormalizeWorker.denormalizeOutboxAgent(
                 new DenormalizeDto(
                         userId,
                         avatarUrl
@@ -88,12 +89,8 @@ public class profileServiceImpl implements profileService {
 
     @Transactional
     public profile updateProfile(String userId, updateProfile data, MultipartFile newPic) {
-        long start = System.currentTimeMillis();
-
-        long t1 = System.currentTimeMillis();
         profile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProfileNotFound("Profile not found"));
-        log.info("find profile took {} ms", System.currentTimeMillis() - t1);
 
         if (data.getBio() != null) profile.setBio(data.getBio());
         if (data.getPrivateAcc() != null) profile.setPrivateAcc(data.getPrivateAcc());
@@ -101,19 +98,15 @@ public class profileServiceImpl implements profileService {
         String oldUrl = profile.getProfilePicUrl();
 
         if (newPic != null && !newPic.isEmpty()) {
-            long t2 = System.currentTimeMillis();
             String newUrl = r2ImageService.uploadProfilePic(newPic);
-            log.info("uploadProfilePic took {} ms", System.currentTimeMillis() - t2);
             profile.setProfilePicUrl(newUrl);
         }
 
-        long t3 = System.currentTimeMillis();
         profile saved = profileRepository.save(profile);
-        log.info("save profile took {} ms", System.currentTimeMillis() - t3);
 
         if (newPic != null && !newPic.isEmpty()) {
             DenormalizeDto denorm = new DenormalizeDto(userId, saved.getProfilePicUrl());
-            denormalizeService.denormalize(denorm);
+            denormalizeWorker.denormalizeOutboxAgent(denorm);
 
             if (oldUrl != null && !oldUrl.isEmpty()) {
                 try {
@@ -123,8 +116,6 @@ public class profileServiceImpl implements profileService {
                 }
             }
         }
-
-        log.info("total updateProfile took {} ms", System.currentTimeMillis() - start);
         return saved;
     }
 
