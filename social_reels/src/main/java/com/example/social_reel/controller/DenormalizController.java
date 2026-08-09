@@ -21,20 +21,8 @@ import java.util.Set;
 @RequestMapping("/api/reel")
 public class DenormalizController {
 
-    private final DenormalizeService denormalizeService;
-
     private final ViewService viewService;
 
-    @PutMapping("/denormalize")
-    public ResponseEntity<Void> reelDenormalize(
-            @RequestBody DenormalizeDto data
-            ){
-
-        denormalizeService.denormalize(data.userId(), data.avatar());
-
-        return ResponseEntity.accepted().build();
-
-    }
 
 
     @PutMapping("/view-update")

@@ -66,6 +66,19 @@
 			<artifactId>micrometer-tracing-bridge-otel</artifactId>
 		</dependency>
 
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+
+
 		<!-- OpenTelemetry Exporter for Traces -->
 		<dependency>
 			<groupId>io.opentelemetry</groupId>
