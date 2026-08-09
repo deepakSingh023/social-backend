@@ -24,7 +24,7 @@ public class GatewayHeaderFilter extends OncePerRequestFilter {
         String api = req.getRequestURI();
 
         if(api.startsWith("/actuator") || api.startsWith("/api/health") || api.startsWith("/api/interaction/check") ||
-        api.startsWith("/api/interactions/getInteractions") || api.startsWith("/api/interactions/denormalize") ){
+        api.startsWith("/api/interactions/getInteractions")){
             filterChain.doFilter(req,res);
             return;
         }

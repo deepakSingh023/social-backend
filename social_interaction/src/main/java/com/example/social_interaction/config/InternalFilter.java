@@ -19,8 +19,7 @@ public class InternalFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request){
 
         String uri = request.getRequestURI();
-        return ! (uri.startsWith("/api/interaction/denormalize")
-                 || uri.startsWith("/api/interactions/getInteractions")
+        return ! (uri.startsWith("/api/interactions/getInteractions")
                  || uri.startsWith("/api/interaction/check"));
     }
 

@@ -19,8 +19,6 @@ public class DenormalizeService {
     private final MongoTemplate mongoTemplate;
 
 
-
-    @Async("denormalize")
     public void avatarDenormalization(String userId, String avatar){
 
         Query query = new Query();

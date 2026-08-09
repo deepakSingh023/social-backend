@@ -13,17 +13,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/comments/denormalize")
 public class DenormalizeController {
 
-    private final DenormalizeService denormalizeService;
-
     private final LikeAndCommentCleanupService likeAndCommentCleanupService;
 
-    @PutMapping("/update")
-    public ResponseEntity<Void> denormalizeImage(
-            @RequestBody DenormalizeDto data
-            ){
-        denormalizeService.denormalizeCommentAvatar(data.avatar(),data.userId());
-        return ResponseEntity.accepted().build();
-    }
 
     @DeleteMapping("/cleanup")
     public ResponseEntity<Void> deleteLikesAndComments(
