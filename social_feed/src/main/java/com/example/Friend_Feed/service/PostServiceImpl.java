@@ -6,7 +6,6 @@ import com.example.Friend_Feed.dto.InteractionDto;
 import com.example.Friend_Feed.dto.PostResponse;
 import com.example.Friend_Feed.entity.Feed;
 import com.example.Friend_Feed.entity.Post;
-import com.example.Friend_Feed.filter.JwtAuthenticationFilter;
 import com.example.Friend_Feed.repository.FeedRepository;
 import com.example.Friend_Feed.utils.LikesClient;
 import com.example.Friend_Feed.utils.PostClient;
@@ -16,8 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 

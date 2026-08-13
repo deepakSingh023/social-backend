@@ -1,6 +1,6 @@
 package com.example.social_post.dto;
 
-import com.example.social_post.ImpressionType;
+import com.example.social_post.enums.ImpressionType;
 
 public record IncrementDecDto(
         String postId,

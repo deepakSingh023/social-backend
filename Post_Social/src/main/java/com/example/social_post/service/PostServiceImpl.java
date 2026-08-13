@@ -148,7 +148,7 @@ public class PostServiceImpl implements PostService {
                 savedPost.getId()
         );
 
-        feedAsyncService.createFeed(data,token);
+        feedAsyncService.createFeed(data);
 
         profileClient.updatePostCounter(token,new ReelUpdate(userId,+1));
 
@@ -183,7 +183,7 @@ public class PostServiceImpl implements PostService {
                 savedPost.getId()
         );
 
-        feedAsyncService.createFeed(data2,token);
+        feedAsyncService.createFeed(data2);
 
 
         profileServiceUpdate.denormProfileAdd(new ReelUpdate(userId,+1));

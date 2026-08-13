@@ -1,6 +1,10 @@
 package com.example.social_post.service;
 
 import com.example.social_post.dto.CreateFeed;
+import com.example.social_post.entity.Outbox;
+import com.example.social_post.enums.EventStatus;
+import com.example.social_post.enums.EventType;
+import com.example.social_post.repository.OutboxRepository;
 import com.example.social_post.util.FeedClient;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -10,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+
 
 @Service
 @RequiredArgsConstructor
@@ -17,25 +23,33 @@ public class FeedAsyncService {
 
     private final FeedClient feedClient;
 
-    private final static Logger log = LoggerFactory.getLogger(FeedAsyncService.class);
 
-    @Retry(name= "importantApi")
-    @CircuitBreaker(name = "importantApi",
-    fallbackMethod = "fallback")
+
+    private final TraceContextService traceContextService;
+
+    private final OutboxRepository outboxRepository;
+
+
     @Async("feedCreate")
-    public void createFeed(CreateFeed data , String token){
+    public void createFeed(CreateFeed data){
 
-        feedClient.createFeed(token,data);
+        Instant now = Instant.now();
 
-    }
+        String trace = traceContextService.currentTraceParent();
 
-    public void fallback(
-            CreateFeed data ,
-            String token  ,
-            Throwable ex
-    ){
+        Outbox outbox = Outbox.builder()
+                .aggregateId(data.postId())
+                .aggregateType("POST")
+                .eventType(EventType.CREATE)
+                .topic("post-feed-events-delete")
+                .status(EventStatus.PENDING)
+                .payload(data)
+                .retryCount(1)
+                .createdAt(now)
+                .traceParent(trace)
+                .build();
 
-        log.error(" creation of feed creation failed for user = {} and post = {}",data.userId(),data.postId(),ex);
+        outboxRepository.save(outbox);
 
     }
 }

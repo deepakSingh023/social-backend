@@ -1,4 +1,4 @@
-package com.example.social_post;
+package com.example.social_post.enums;
 
 public enum ImpressionType {
     LIKE("likes"),

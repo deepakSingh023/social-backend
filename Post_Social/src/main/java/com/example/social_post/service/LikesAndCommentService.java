@@ -1,8 +1,6 @@
 package com.example.social_post.service;
 
 
-import com.example.social_post.ImpressionType;
-import com.example.social_post.dto.CreateFeed;
 import com.example.social_post.dto.IncrementDecDto;
 import com.example.social_post.entity.Post;
 import com.example.social_post.util.LikeClient;

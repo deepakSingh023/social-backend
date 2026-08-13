@@ -1,7 +1,4 @@
 package com.example.Friend_Feed.service;
-
-
-import com.example.Friend_Feed.aspect.LogAspect;
 import com.example.Friend_Feed.dto.CreateFeed;
 import com.example.Friend_Feed.dto.InteractionDto;
 import com.example.Friend_Feed.dto.RecipientPage;
