@@ -9,13 +9,6 @@ import java.util.List;
 
 public interface PostService {
 
-    void createFeed(CreateFeed data);
-
-    void createInteractionFeed(InteractionDto data);
-
     FeedResponse getFeeds(String userId, String cursor , String cursorId);
 
-    void deleteFeeds(String authorId, String feedOwnerId);
-
-    void deleteFeedPost(String postId);
 }

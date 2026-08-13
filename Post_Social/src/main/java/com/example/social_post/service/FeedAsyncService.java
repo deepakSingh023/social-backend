@@ -41,7 +41,7 @@ public class FeedAsyncService {
                 .aggregateId(data.postId())
                 .aggregateType("POST")
                 .eventType(EventType.CREATE)
-                .topic("post-feed-events-delete")
+                .topic("post-feed-events-create")
                 .status(EventStatus.PENDING)
                 .payload(data)
                 .retryCount(1)

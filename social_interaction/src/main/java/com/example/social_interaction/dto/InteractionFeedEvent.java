@@ -1,4 +1,4 @@
-package com.example.Friend_Feed.dto;
+package com.example.social_interaction.dto;
 
 
 public record InteractionFeedEvent(

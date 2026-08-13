@@ -44,17 +44,6 @@ public class PostServiceImpl implements PostService {
     private String token;
 
     @Override
-    public void createFeed(CreateFeed data){
-        fanOutOnWriteFeedService.createFeed(data);
-    }
-
-
-    @Override
-    public void createInteractionFeed(InteractionDto data){
-        fanOutOnWriteFeedService.createFeedForInteraction(data);
-    }
-
-    @Override
     public FeedResponse getFeeds(String userId, String cursor, String cursorId){
 
         log.info("service reached");
@@ -193,14 +182,5 @@ public class PostServiceImpl implements PostService {
 
     }
 
-    public void deleteFeeds(String authorId, String feedOwnerId){
-
-        fanOutOnWriteFeedService.deleteFeed(feedOwnerId,authorId);
-    }
-
-    public void deleteFeedPost(String postId){
-
-        fanOutOnWriteFeedService.deleteFeedPost(postId);
-    }
 
 }

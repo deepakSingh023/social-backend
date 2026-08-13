@@ -41,7 +41,6 @@ public class FanOutOnWriteFeedService {
 
     //used to create feed on creation of post or a new interaction following a fan out on write architecture
 
-    @Async("createFeed")
     public void createFeed(CreateFeed data){
 
         String authorId = data.userId();
@@ -85,7 +84,6 @@ public class FanOutOnWriteFeedService {
 
     }
 
-    @Async("createPostFeed")
     public void createFeedForInteraction(InteractionDto data){
 
         String authorId = data.authorId();
@@ -123,7 +121,6 @@ public class FanOutOnWriteFeedService {
 
     }
 
-    @Async("deleteFeed")
     public void deleteFeed(String feedOwnerId, String authorId){
 
         Query query = new Query();
@@ -137,7 +134,6 @@ public class FanOutOnWriteFeedService {
 
     }
 
-    @Async("deleteFeed")
     public void deleteFeedPost(String postId){
 
         Query query = new Query();
