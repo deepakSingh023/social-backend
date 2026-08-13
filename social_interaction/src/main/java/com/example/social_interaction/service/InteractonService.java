@@ -1,9 +1,9 @@
 package com.example.social_interaction.service;
+import com.example.social_interaction.dto.InteractionDto;
 import com.example.social_interaction.entity.Feed;
 import com.example.social_interaction.repository.FeedRepository;
 import com.example.social_interaction.repository.FriendRepository;
 import com.example.social_interaction.repository.RelationRepository;
-import com.example.social_interaction.tasks.PostClient;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +28,9 @@ public class InteractonService {
 
     private final RelationRepository relationRepository;
 
+    private  final FeedWorker feedWorker;
+
     private static final Logger log = LoggerFactory.getLogger(InteractonService.class);
-
-
-    private final PostClient postClient;
-
 
     @Value("${service.secret}")
     private String token;
@@ -97,7 +95,8 @@ public class InteractonService {
                     recipientId
             );
 
-            postClient.deleteFeed(token,recipientId,authorId);
+            feedWorker.deleteFeedWorker(new InteractionDto(authorId,recipientId));
+
         }
     }
 }

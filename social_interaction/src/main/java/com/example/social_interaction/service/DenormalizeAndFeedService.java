@@ -4,7 +4,6 @@ package com.example.social_interaction.service;
 import com.example.social_interaction.dto.InteractionDto;
 import com.example.social_interaction.dto.UpdateCounter;
 import com.example.social_interaction.tasks.CounterClient;
-import com.example.social_interaction.tasks.PostClient;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +26,16 @@ public class DenormalizeAndFeedService {
     private String secret;
 
 
-    @Async
+    @Async("workerThread")
     public void worker(UpdateCounter data1, UpdateCounter data2, InteractionDto data3, InteractionDto data4){
+
+        try {
+            feedWorker.createFeedWorker(data3);
+            feedWorker.createFeedWorker(data4);
+        } catch (Exception e) {
+            log.error("Failed to create feed outbox events", e);
+            return;
+        }
 
         try {
             counterClient.denormalize(data1,secret);
@@ -43,16 +50,23 @@ public class DenormalizeAndFeedService {
         }
 
 
-        feedWorker.createFeedWorker(data3,secret);
 
-        feedWorker.createFeedWorker(data4,secret);
 
 
     }
 
 
-    @Async
+    @Async("workerThread")
     public void followerWorker(UpdateCounter data1, UpdateCounter data2, InteractionDto data3){
+
+        try {
+            feedWorker.createFeedWorker(data3);
+        } catch (Exception e) {
+            log.error("Failed to create feed outbox events", e);
+            return;
+        }
+
+
 
         try {
             counterClient.denormalize(data1,secret);
@@ -66,7 +80,7 @@ public class DenormalizeAndFeedService {
             log.error("counter denormalization failed for user2={}",data2.userId(),e);
         }
 
-        feedWorker.createFeedWorker(data3,secret);
+
 
     }
 }

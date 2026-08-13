@@ -7,7 +7,6 @@ import com.example.social_interaction.enums.FollowerType;
 import com.example.social_interaction.repository.FollowRequestRepository;
 import com.example.social_interaction.repository.RelationRepository;
 import com.example.social_interaction.tasks.CounterClient;
-import com.example.social_interaction.tasks.PostClient;
 import com.example.social_interaction.tasks.ProfileClient;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;

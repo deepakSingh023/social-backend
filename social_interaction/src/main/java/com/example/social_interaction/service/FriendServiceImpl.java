@@ -10,7 +10,6 @@ import com.example.social_interaction.repository.FriendRepository;
 import com.example.social_interaction.repository.FriendRequestRepository;
 import com.example.social_interaction.tasks.ChatClient;
 import com.example.social_interaction.tasks.CounterClient;
-import com.example.social_interaction.tasks.PostClient;
 import com.example.social_interaction.tasks.ProfileClient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
