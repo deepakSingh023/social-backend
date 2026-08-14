@@ -7,6 +7,7 @@ import com.example.social_chat.repository.ChatMessageRepository;
 import com.example.social_chat.repository.ConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -23,6 +24,8 @@ public class ChatService {
     private final ChatPublisher publisher;
     private final ObjectMapper mapper;
     private final ConversationService conversationService;
+
+
 
 
     public void processMessage(ChatRequest request, String senderId) {
@@ -45,7 +48,7 @@ public class ChatService {
 
         try {
             publisher.publish(
-                    mapper.writeValueAsString(message)
+                    mapper.writeValueAsString(message),request.getConversationId(),senderId
             );
         } catch (Exception e) {
             e.printStackTrace();

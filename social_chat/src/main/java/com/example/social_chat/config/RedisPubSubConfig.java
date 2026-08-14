@@ -1,5 +1,6 @@
 package com.example.social_chat.config;
 import com.example.social_chat.redis.ChatSubscriber;
+import com.example.social_chat.utils.InstanceInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ public class RedisPubSubConfig {
 
     private final RedisConnectionFactory connectionFactory;
     private final ChatSubscriber chatSubscriber;
+    private final InstanceInfo instanceInfo;
 
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer() {
@@ -23,7 +25,7 @@ public class RedisPubSubConfig {
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(
                 chatSubscriber,
-                new PatternTopic("chat-channel")
+                new PatternTopic("chat-channel:"  + instanceInfo.getInstanceId())
         );
 
         return container;
