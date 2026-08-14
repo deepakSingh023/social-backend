@@ -2,6 +2,7 @@ package com.example.social_chat.services;
 
 
 import com.example.social_chat.dto.ConversationDto;
+import com.example.social_chat.dto.ConversationPresence;
 import com.example.social_chat.entity.Conversation;
 import com.example.social_chat.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,6 +25,8 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
 
     private final MongoTemplate mongoTemplate;
+
+    private final RedisTemplate<String , String> redisTemplate;
 
 
     public void createCOnvo(ConversationDto data){
@@ -72,6 +76,15 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findByUserId1AndUserId2(userId1,userId2)
                 .orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND,"conversation not found"));
 
+        String key = "Conversation:" + conversation.getId();
+
+        redisTemplate.opsForSet().add(key, senderId);
+
+        redisTemplate.opsForHash().put(
+                "User:" + senderId,
+                "conversation",
+                conversation.getId()
+        );
 
         return conversation.getId();
 
