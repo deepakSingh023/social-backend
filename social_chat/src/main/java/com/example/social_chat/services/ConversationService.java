@@ -28,7 +28,9 @@ public class ConversationService {
 
     private final RedisTemplate<String , String> redisTemplate;
 
-
+    // TODO: Add a unique compound index on (userId1, userId2).
+    // Prevents duplicate conversations under concurrent creation requests
+   // and improves lookup performance for findByUserId1AndUserId2().
     public void createCOnvo(ConversationDto data){
 
         String userId1 = data.user1Id().compareTo(data.user2Id())<0? data.user1Id() : data.user2Id();
