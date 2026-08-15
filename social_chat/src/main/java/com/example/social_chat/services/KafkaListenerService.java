@@ -4,19 +4,20 @@ package com.example.social_chat.services;
 import com.example.social_chat.dto.ConversationDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
-public class KafkaListener {
+public class KafkaListenerService {
 
     private final RedisTemplate<String, String> redisTemplate;
 
     private final ConversationService conversationService;
 
-    @org.springframework.kafka.annotation.KafkaListener(topics = "conversation-create")
+    @KafkaListener(topics = "conversation-create")
     public void listenerCreate(ConversationDto data){
 
         Boolean exists = redisTemplate.hasKey(data.eventId());
@@ -37,7 +38,7 @@ public class KafkaListener {
 
     }
 
-    @org.springframework.kafka.annotation.KafkaListener(topics = "conversation-delete")
+    @KafkaListener(topics = "conversation-delete")
     public void listenerDelete(ConversationDto data){
 
         Boolean exists = redisTemplate.hasKey(data.eventId());

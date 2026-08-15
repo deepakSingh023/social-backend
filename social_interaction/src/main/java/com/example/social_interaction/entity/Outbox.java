@@ -1,6 +1,7 @@
 package com.example.social_interaction.entity;
 
 import com.example.social_interaction.dto.InteractionDto;
+import com.example.social_interaction.enums.AggregateType;
 import com.example.social_interaction.enums.EventStatus;
 import com.example.social_interaction.enums.EventType;
 import lombok.AllArgsConstructor;
@@ -24,7 +25,7 @@ public class Outbox {
 
     private  String aggregateId;
 
-    private  String aggregateType;
+    private AggregateType aggregateType;
 
     private EventType eventType;
 
@@ -32,7 +33,7 @@ public class Outbox {
 
     private EventStatus status;
 
-    private InteractionDto payload;
+    private Object payload;
 
     private  int retryCount;
 

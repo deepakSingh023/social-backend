@@ -1,9 +1,13 @@
 package com.example.social_interaction.service;
 
+import com.example.social_interaction.dto.ConversationDto;
 import com.example.social_interaction.dto.InteractionDto;
+import com.example.social_interaction.dto.InteractionFeedEvent;
 import com.example.social_interaction.entity.Outbox;
+import com.example.social_interaction.enums.AggregateType;
 import com.example.social_interaction.enums.EventStatus;
 import com.example.social_interaction.repository.OutboxRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import lombok.RequiredArgsConstructor;
@@ -20,20 +24,22 @@ import java.util.List;
 public class FeedProducer {
 
     private final OutboxRepository outboxRepository;
-
-    private final KafkaTemplate<String, InteractionDto> kafkaTemplate;
-
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final TraceContextService traceContextService;
+    private final ObjectMapper objectMapper;
 
-    private final static Logger log = LoggerFactory.getLogger(FeedProducer.class);
-
+    private static final Logger log =
+            LoggerFactory.getLogger(FeedProducer.class);
 
     @Scheduled(fixedDelay = 1000)
-    public void KafkaPublisher(){
+    public void KafkaPublisher() {
 
-        List<Outbox> data = outboxRepository.findTop100ByStatusOrderByCreatedAt(EventStatus.PENDING);
+        List<Outbox> data =
+                outboxRepository.findTop100ByStatusOrderByCreatedAt(
+                        EventStatus.PENDING
+                );
 
-        for(Outbox event : data){
+        for (Outbox event : data) {
 
             try {
                 Context context =
@@ -41,31 +47,72 @@ public class FeedProducer {
                                 event.getTraceParent()
                         );
 
-
                 try (Scope ignored = context.makeCurrent()) {
+
+                    Object eve;
+
+                    if (event.getAggregateType() == AggregateType.INTERACTION) {
+
+                        InteractionDto payload =
+                                objectMapper.convertValue(
+                                        event.getPayload(),
+                                        InteractionDto.class
+                                );
+
+                        eve = new InteractionFeedEvent(
+                                event.getId(),
+                                payload.authorId(),
+                                payload.feedOwnerId()
+                        );
+
+                    } else if (event.getAggregateType() == AggregateType.CONVERSATION) {
+
+                        ConversationDto payload =
+                                objectMapper.convertValue(
+                                        event.getPayload(),
+                                        ConversationDto.class
+                                );
+
+                        eve = new ConversationDto(
+                                event.getId(),
+                                payload.user1Id(),
+                                payload.user2Id()
+                        );
+
+                    } else {
+
+                        log.error(
+                                "Unknown aggregate type {} for event {}",
+                                event.getAggregateType(),
+                                event.getId()
+                        );
+
+                        continue;
+                    }
 
                     kafkaTemplate.send(
                             event.getTopic(),
                             event.getAggregateId(),
-                            event.getPayload()
+                            eve
                     ).get();
-
                 }
 
                 event.setStatus(EventStatus.SUCCEED);
 
             } catch (Exception e) {
 
-                event.setRetryCount(event.getRetryCount() + 1);
+                event.setRetryCount(
+                        event.getRetryCount() + 1
+                );
 
-                log.error("Kafka publish failed id={}",
+                log.error(
+                        "Kafka publish failed id={}",
                         event.getId(),
-                        e);
+                        e
+                );
             }
         }
 
         outboxRepository.saveAll(data);
-
-
     }
 }

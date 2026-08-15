@@ -3,6 +3,7 @@ package com.example.social_interaction.service;
 
 import com.example.social_interaction.dto.InteractionDto;
 import com.example.social_interaction.entity.Outbox;
+import com.example.social_interaction.enums.AggregateType;
 import com.example.social_interaction.enums.EventStatus;
 import com.example.social_interaction.enums.EventType;
 import com.example.social_interaction.repository.OutboxRepository;
@@ -14,7 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
-
+// Outbox is persisted synchronously after the business write.
+// This avoids returning success before the event is durably queued.
+// The business write and outbox write are not currently one atomic
+// MongoDB transaction; this is an accepted consistency tradeoff.
 @RequiredArgsConstructor
 @Service
 public class FeedWorker {
@@ -33,7 +37,7 @@ public class FeedWorker {
 
         Outbox outbox = Outbox.builder()
                 .aggregateId(data.feedOwnerId())
-                .aggregateType("INTERACTION")
+                .aggregateType(AggregateType.INTERACTION)
                 .eventType(EventType.CREATE)
                 .topic("create-feed-interaction")
                 .status(EventStatus.PENDING)
@@ -56,7 +60,7 @@ public class FeedWorker {
 
         Outbox outbox = Outbox.builder()
                 .aggregateId(data.feedOwnerId())
-                .aggregateType("INTERACTION")
+                .aggregateType(AggregateType.INTERACTION)
                 .eventType(EventType.DELETE)
                 .topic("delete-feed-interaction")
                 .status(EventStatus.PENDING)
