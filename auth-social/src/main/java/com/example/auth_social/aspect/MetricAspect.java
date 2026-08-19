@@ -19,7 +19,7 @@ public class MetricAspect {
         this.registry = registry;
     }
 
-    @Around("execution(* com.example.auth_social.controller..*(..))")
+    @Around("execution(* com.example.auth_social.services..*(..))")
     public Object metricApi(ProceedingJoinPoint jp) throws  Throwable {
 
         String api = jp.getSignature().getName();

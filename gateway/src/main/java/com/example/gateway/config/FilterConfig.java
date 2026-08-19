@@ -8,6 +8,7 @@ import org.springframework.web.servlet.function.ServerResponse;
 
 @RequiredArgsConstructor
 @Configuration
+
 public class FilterConfig {
 
     private final HeaderPropagationFilter headerPropagationFilter;

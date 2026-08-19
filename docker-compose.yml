@@ -3,20 +3,19 @@ version: '3.8'
 services:
   auth-service:
     build: ./auth-social
-    image: 127.0.0.1:5000/auth-service:latest
-    ports:
-      - "8080:8080"
+    image: auth-service:latest
     environment:
       DB_URL: ${AUTH_DB_URL}
       DB_USERNAME: ${AUTH_DB_USERNAME}
       DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
       PROFILE_SERVICE_URL: http://profile-service:8081
     depends_on:
       - profile-service
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -29,9 +28,7 @@ services:
 
   profile-service:
     build: ./Profile_social-
-    image: 127.0.0.1:5000/profile-service:latest
-    ports:
-      - "8081:8081"
+    image: profile-service:latest
     environment:
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
@@ -42,7 +39,7 @@ services:
       R2_PUBLIC_BASE_URL: ${R2_PROFILE_BASE_URL}
       R2_ENDPOINT: ${R2_ENDPOINT_PROFILE}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -55,9 +52,7 @@ services:
 
   post-service:
     build: ./Post_Social
-    image: 127.0.0.1:5000/post-service:latest
-    ports:
-      - "8082:8082"
+    image: post-service:latest
     environment:
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
@@ -67,7 +62,7 @@ services:
       R2_SECRET_KEY: ${R2_POST_SECRET_KEY}
       R2_POSTS_PUBLIC_URL: ${R2_POSTS_PUBLIC_URL}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -80,15 +75,13 @@ services:
 
   likes-service:
     build: ./social-likesAndcomments
-    image: 127.0.0.1:5000/likes-service:latest
-    ports:
-      - "8083:8083"
+    image: likes-service:latest
     environment:
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
       MONGO_URI: ${LIKES_MONGO_URI}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -101,19 +94,17 @@ services:
 
   reel-service:
     build: ./social_reels
-    image: 127.0.0.1:5000/reel-service:latest
-    ports:
-      - "8084:8084"
+    image: reel-service:latest
     environment:
       MONGO_URI: ${REEL_MONGO_URI}
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
-      R2_ACCOUNT_ID: ${REEL_ACCOUNT_ID}
-      R2_ACCESS_KEY: ${REEL_ACCESS_KEY}
-      R2_SECRET_KEY: ${REEL_SECRET_KEY}
-      R2_PUBLIC_BASE_URL: ${REEL_PUBLIC_URL}
+      R2_ACCOUNT_ID: ${R2_REEL_ACCOUNT_ID}
+      R2_ACCESS_KEY: ${R2_REEL_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_REEL_SECRET_KEY}
+      R2_PUBLIC_BASE_URL: ${R2_REEL_PUBLIC_URL}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -126,15 +117,13 @@ services:
 
   interaction-service:
     build: ./social_interaction
-    image: 127.0.0.1:5000/interaction-service:latest
-    ports:
-      - "8085:8085"
+    image: interaction-service:latest
     environment:
       MONGO_URI: ${INTERACTION_MONGO_URI}
       SERVICE_SECRET: ${SERVICE_SECRET}
       GATEWAY_SECRET: ${GATEWAY_SECRET}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -147,7 +136,7 @@ services:
 
   feed-service:
     build: ./social_feed
-    image: 127.0.0.1:5000/feed-service:latest
+    image: feed-service:latest
     ports:
       - "8086:8086"
     environment:
@@ -168,7 +157,7 @@ services:
 
   view-service:
     build: ./social_view
-    image: 127.0.0.1:5000/view-service:latest
+    image: view-service:latest
     ports:
       - "8087:8087"
     environment:
@@ -188,7 +177,7 @@ services:
 
   interest-service:
     build: ./social-interest
-    image: 127.0.0.1:5000/interest-service:latest
+    image: interest-service:latest
     ports:
       - "8088:8088"
     environment:
@@ -208,7 +197,7 @@ services:
 
   reelfetch-service:
     build: ./social-reelFetch
-    image: 127.0.0.1:5000/reelfetch-service:latest
+    image: reelfetch-service:latest
     ports:
       - "8089:8089"
     environment:
@@ -228,7 +217,7 @@ services:
 
   chat-service:
     build: ./social_chat
-    image: 127.0.0.1:5000/chat-service:latest
+    image: chat-service:latest
     environment:
       CHAT_MONGO_URI: ${CHAT_MONGO_URI}
       JWT_SECRET: ${JWT_SECRET}
@@ -257,7 +246,7 @@ services:
 
   gateway:
     build: gateway
-    image: 127.0.0.1:5000/gateway:latest
+    image: gateway:latest
     ports:
       - "8091:8091"
     environment:
@@ -397,5 +386,5 @@ volumes:
 
 networks:
   monitoring:
-    driver: overlay
+    driver: bridge
     attachable: true

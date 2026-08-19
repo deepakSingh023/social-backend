@@ -93,11 +93,3 @@ scrape_configs:
         type: 'A'
         port: 8091
 
-  # Infrastructure monitoring
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis:6379']
-
-  - job_name: 'kafka'
-    static_configs:
-      - targets: ['kafka:9092']

@@ -2,7 +2,6 @@ package com.example.Social.profile.config;
 
 import com.example.Social.profile.filter.GateWayHeaderFilter;
 import com.example.Social.profile.filter.InternalFilter;
-import com.example.Social.profile.utils.JwtUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
