@@ -67,7 +67,6 @@ public class GatewayRouteConfig {
 
                 .and(route("post-service")
                         .route(RequestPredicates.path("/api/posts/**"), http("http://post-service:8082"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(100)
@@ -76,8 +75,7 @@ public class GatewayRouteConfig {
                         .build())
 
                 .and(route("profile-service")
-                        .route(RequestPredicates.path("/api/profile/**"), http("http://profile-service:8081"))
-                        .filter(stripPrefix(2))
+                        .route(RequestPredicates.path("/api/profiles/**"), http("http://profile-service:8081"))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(60)
@@ -87,7 +85,6 @@ public class GatewayRouteConfig {
 
                 .and(route("feed-service")
                         .route(RequestPredicates.path("/api/feed/**"), http("http://feed-service:8086"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(200)
@@ -97,7 +94,6 @@ public class GatewayRouteConfig {
 
                 .and(route("likes-service")
                         .route(RequestPredicates.path("/api/likes/**"), http("http://likes-service:8083"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(80)
@@ -107,7 +103,6 @@ public class GatewayRouteConfig {
 
                 .and(route("interaction-service")
                         .route(RequestPredicates.path("/api/interactions/**"), http("http://interaction-service:8085"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(80)
@@ -117,7 +112,6 @@ public class GatewayRouteConfig {
 
                 .and(route("reel-service")
                         .route(RequestPredicates.path("/api/reels/**"), http("http://reel-service:8084"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(120)
@@ -127,7 +121,6 @@ public class GatewayRouteConfig {
 
                 .and(route("view-service")
                         .route(RequestPredicates.path("/api/views/**"), http("http://view-service:8087"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(150)
@@ -137,7 +130,6 @@ public class GatewayRouteConfig {
 
                 .and(route("reelfetch-service")
                         .route(RequestPredicates.path("/api/reelfetch/**"), http("http://reelfetch-service:8089"))
-                        .filter(stripPrefix(2))
                         .filter(rateLimit(c -> c
                                 .setKeyResolver(tokenKeyResolver())
                                 .setCapacity(200)
