@@ -40,8 +40,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http,GatewayHeaderFilter gatewayHeaderFilter, InternalFilter internalFilter) throws Exception {
 
         http
-                .cors(Customizer.withDefaults()) // ✅ ENABLE CORS
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )

@@ -20,9 +20,7 @@ public class ViewController {
 
     @PostMapping("/create")
     public void createView(@RequestBody ViewDto data,
-                           Authentication auth) {
-
-        String userId = auth.getName();
+                           @RequestHeader("X-User-Id") String userId) {
 
         viewService.registerView(data,userId);
     }
