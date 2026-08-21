@@ -144,7 +144,7 @@ services:
       SERVICE_SECRET: ${SERVICE_SECRET}
       MONGO_URI: ${FEED_MONGO_URI}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -164,7 +164,7 @@ services:
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -184,7 +184,7 @@ services:
       MONGO_URI: ${INTEREST_MONGO_URI}
       SERVICE_SECRET: ${SERVICE_SECRET}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -204,7 +204,7 @@ services:
       GATEWAY_SECRET: ${GATEWAY_SECRET}
       SERVICE_SECRET: ${SERVICE_SECRET}
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
@@ -233,7 +233,7 @@ services:
     expose:
       - "8090"
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '0.50'
