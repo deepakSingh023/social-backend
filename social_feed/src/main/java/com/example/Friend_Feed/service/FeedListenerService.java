@@ -6,6 +6,8 @@ import com.example.Friend_Feed.dto.InteractionDto;
 import com.example.Friend_Feed.dto.InteractionFeedEvent;
 import com.example.Friend_Feed.dto.PostFeedEvent;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -29,8 +31,12 @@ public class FeedListenerService {
 
     private final RedisTemplate<String,String> redisTemplate;
 
+    private final static Logger log = LoggerFactory.getLogger(FeedListenerService.class);
+
     @KafkaListener(topics = "post-feed-events-create")
     public void handlePostEvent(PostFeedEvent event) {
+
+        log.info(" RECEIVED POST CREATE EVENT: {}", event);
 
         Boolean exists = redisTemplate.hasKey(event.eventId());
 
@@ -53,6 +59,8 @@ public class FeedListenerService {
     @KafkaListener(topics = "post-feed-events-delete")
     public void handlePostDeleteEvent(PostFeedEvent event) {
 
+        log.info(" RECEIVED POST DELETE EVENT: {}", event);
+
         Boolean exists = redisTemplate.hasKey(event.eventId());
 
         //we use Boolean.TRUE.equals because if we only check exists and if return null then it will cause a Null pointer exception Boolean.TRUE.equals prevents it
@@ -71,6 +79,8 @@ public class FeedListenerService {
 
     @KafkaListener(topics = "create-feed-interaction")
     public void handleInteractionEvent(InteractionFeedEvent event) {
+
+        log.info(" RECEIVED INTERACTION CRETE EVENT: {}", event);
 
         Boolean exists = redisTemplate.hasKey(event.eventId());
 
@@ -91,6 +101,8 @@ public class FeedListenerService {
 
     @KafkaListener(topics = "delete-feed-interaction")
     public void handleInteractionDeleteEvent(InteractionFeedEvent event) {
+
+        log.info(" RECEIVED INTERACTION DELETE EVENT: {}", event);
 
         Boolean exists = redisTemplate.hasKey(event.eventId());
 
