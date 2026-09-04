@@ -18,7 +18,8 @@ public class ProfileEventListener {
 
     //The avatar update is naturally idempotent because it overwrites the same value. I implemented Redis idempotency to avoid unnecessary MongoDB writes and reduce server load in case of duplicate Kafka deliveries.
     @KafkaListener(
-            topics = "profile-post-events"
+            topics = "profile-post-events",
+            groupId = "post-service-group"
     )
     public void consume(DenormalizeEvent event) {
 

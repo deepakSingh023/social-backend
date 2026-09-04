@@ -33,7 +33,7 @@ public class FeedListenerService {
 
     private final static Logger log = LoggerFactory.getLogger(FeedListenerService.class);
 
-    @KafkaListener(topics = "post-feed-events-create",groupId = "feed-service-group")
+    @KafkaListener(topics = "post-feed-events-create")
     public void handlePostEvent(PostFeedEvent event) {
 
         log.info(" RECEIVED POST CREATE EVENT: {}", event);
@@ -56,7 +56,7 @@ public class FeedListenerService {
 
     }
 
-    @KafkaListener(topics = "post-feed-events-delete",groupId = "feed-service-group")
+    @KafkaListener(topics = "post-feed-events-delete")
     public void handlePostDeleteEvent(PostFeedEvent event) {
 
         log.info(" RECEIVED POST DELETE EVENT: {}", event);
@@ -77,7 +77,7 @@ public class FeedListenerService {
         );
     }
 
-    @KafkaListener(topics = "create-feed-interaction",groupId = "feed-service-group")
+    @KafkaListener(topics = "create-feed-interaction")
     public void handleInteractionEvent(InteractionFeedEvent event) {
 
         log.info(" RECEIVED INTERACTION CRETE EVENT: {}", event);
@@ -99,7 +99,7 @@ public class FeedListenerService {
 
     }
 
-    @KafkaListener(topics = "delete-feed-interaction",groupId = "feed-service-group")
+    @KafkaListener(topics = "delete-feed-interaction")
     public void handleInteractionDeleteEvent(InteractionFeedEvent event) {
 
         log.info(" RECEIVED INTERACTION DELETE EVENT: {}", event);

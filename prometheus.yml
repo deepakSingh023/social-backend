@@ -3,93 +3,93 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # Internal Prometheus monitoring
+
+  # Prometheus
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets:
+          - 'localhost:9090'
 
-  # Microservices grouped by their specific application ports
-  - job_name: 'swarm-apps-8080'
+  # Auth Service
+  - job_name: 'auth-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.auth-service']
-        type: 'A'
-        port: 8080
+    static_configs:
+      - targets:
+          - 'auth-service:8080'
 
-  - job_name: 'swarm-apps-8081'
+  # Profile Service
+  - job_name: 'profile-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.profile-service']
-        type: 'A'
-        port: 8081
+    static_configs:
+      - targets:
+          - 'profile-service:8081'
 
-  - job_name: 'swarm-apps-8082'
+  # Post Service
+  - job_name: 'post-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.post-service']
-        type: 'A'
-        port: 8082
+    static_configs:
+      - targets:
+          - 'post-service:8082'
 
-  - job_name: 'swarm-apps-8083'
+  # Likes Service
+  - job_name: 'likes-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.likes-service']
-        type: 'A'
-        port: 8083
+    static_configs:
+      - targets:
+          - 'likes-service:8083'
 
-  - job_name: 'swarm-apps-8084'
+  # Reel Service
+  - job_name: 'reel-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.reel-service']
-        type: 'A'
-        port: 8084
+    static_configs:
+      - targets:
+          - 'reel-service:8084'
 
-  - job_name: 'swarm-apps-8085'
+  # Interaction Service
+  - job_name: 'interaction-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.interaction-service']
-        type: 'A'
-        port: 8085
+    static_configs:
+      - targets:
+          - 'interaction-service:8085'
 
-  - job_name: 'swarm-apps-8086'
+  # Feed Service
+  - job_name: 'feed-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.feed-service']
-        type: 'A'
-        port: 8086
+    static_configs:
+      - targets:
+          - 'feed-service:8086'
 
-  - job_name: 'swarm-apps-8087'
+  # View Service
+  - job_name: 'view-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.view-service']
-        type: 'A'
-        port: 8087
+    static_configs:
+      - targets:
+          - 'view-service:8087'
 
-  - job_name: 'swarm-apps-8088'
+  # Interest Service
+  - job_name: 'interest-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.interest-service']
-        type: 'A'
-        port: 8088
+    static_configs:
+      - targets:
+          - 'interest-service:8088'
 
-  - job_name: 'swarm-apps-8089'
+  # Reel Fetch Service
+  - job_name: 'reelfetch-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.reelfetch-service']
-        type: 'A'
-        port: 8089
+    static_configs:
+      - targets:
+          - 'reelfetch-service:8089'
 
-  - job_name: 'swarm-apps-8090'
+  # Chat Service
+  - job_name: 'chat-service'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.chat-service']
-        type: 'A'
-        port: 8090
+    static_configs:
+      - targets:
+          - 'chat-service:8090'
 
-  - job_name: 'swarm-gateway-8091'
+  # API Gateway
+  - job_name: 'gateway'
     metrics_path: '/actuator/prometheus'
-    dns_sd_configs:
-      - names: ['tasks.gateway']
-        type: 'A'
-        port: 8091
-
+    static_configs:
+      - targets:
+          - 'gateway:8091'

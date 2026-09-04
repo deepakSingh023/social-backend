@@ -21,7 +21,7 @@ public class CounterController {
 
 
 
-    @PutMapping
+    @PutMapping("/interaction")
     public ResponseEntity<Void> updateCounter(
             @RequestBody UpdateCounter request
     ) {

@@ -18,7 +18,8 @@ public class KafkaListenerService {
     private  final  DenormalizeService denormalizeService;
 
     @KafkaListener(
-            topics = "profile-comment-events"
+            topics = "profile-comment-events",
+            groupId = "comment-service-group"
     )
     public void consume(DenormalizeEvent event) {
 

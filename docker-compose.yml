@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   auth-service:
     build: ./auth-social
@@ -282,19 +280,33 @@ services:
 
   kafka:
     image: apache/kafka-native:3.8.0
-    ports:
-      - "9092:9092"
+    container_name: kafka
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+
+      # 1. We create two distinct internal names: CLIENTS and BROKER
+      KAFKA_LISTENERS: 'CLIENTS://0.0.0.0:9092,BROKER://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093'
+
+      # 2. Tell your apps to use port 9092. The Kafka engine will use 29092 for itself.
+      KAFKA_ADVERTISED_LISTENERS: 'CLIENTS://kafka:9092,BROKER://kafka:29092'
+
+      # 3. Map these custom names to standard security protocols
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CLIENTS:PLAINTEXT,BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT'
+
+      # 4. Use the BROKER line for internal Kafka consensus
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'BROKER'
+
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093'
       KAFKA_CLUSTER_ID: '4L62ydZaTfa6BiwQHexgZw'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     deploy:
-      replicas: 1 # Core data single-node configurations should remain 1 unless setting up a structural Kafka cluster
+      replicas: 1
       resources:
         limits:
           cpus: '1.00'
@@ -304,6 +316,7 @@ services:
           memory: 512M
     networks:
       - monitoring
+
 
   prometheus:
     image: prom/prometheus:latest
@@ -330,7 +343,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - '3000:3000'
+      - '3001:3001'
     volumes:
       - grafana-data:/var/lib/grafana
     environment:

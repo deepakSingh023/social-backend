@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 public interface CounterClient {
 
 
-    @PutMapping("/api/controller/counter")
+    @PutMapping("/api/controller/counter/interaction")
     void denormalize(
             @RequestBody UpdateCounter data,
             @RequestHeader("X-SECRET-TOKEN") String token

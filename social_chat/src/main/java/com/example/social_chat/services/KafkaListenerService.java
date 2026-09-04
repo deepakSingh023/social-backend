@@ -17,7 +17,7 @@ public class KafkaListenerService {
 
     private final ConversationService conversationService;
 
-    @KafkaListener(topics = "conversation-create")
+    @KafkaListener(topics = "conversation-create", groupId = "chat-convo-create-group")
     public void listenerCreate(ConversationDto data){
 
         Boolean exists = redisTemplate.hasKey(data.eventId());
@@ -38,7 +38,7 @@ public class KafkaListenerService {
 
     }
 
-    @KafkaListener(topics = "conversation-delete")
+    @KafkaListener(topics = "conversation-delete", groupId = "chat-convo-delete-group")
     public void listenerDelete(ConversationDto data){
 
         Boolean exists = redisTemplate.hasKey(data.eventId());
