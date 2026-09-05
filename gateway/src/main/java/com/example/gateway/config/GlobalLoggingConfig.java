@@ -4,14 +4,14 @@ import com.example.gateway.filter.LoggingFilters;
 import com.example.gateway.filter.GatewayMetrics;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.function.HandlerFilterFunction;
-import org.springframework.web.servlet.function.ServerResponse;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
 
 @Configuration
 public class GlobalLoggingConfig {
 
     @Bean
-    public HandlerFilterFunction<ServerResponse, ServerResponse> globalLoggingFilter(GatewayMetrics metrics) {
+    public GlobalFilter globalLoggingFilter(GatewayMetrics metrics) {
+        // LoggingFilters.audit should return a GlobalFilter wrapper
         return LoggingFilters.audit(metrics);
     }
 }
