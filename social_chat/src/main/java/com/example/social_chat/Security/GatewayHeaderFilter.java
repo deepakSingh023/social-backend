@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 
 @RequiredArgsConstructor
@@ -14,22 +13,27 @@ public class GatewayHeaderFilter extends OncePerRequestFilter {
 
     private final String gatewaySecret;
 
+    // THE DEFINITIVE FIX: Tell Spring Security to bypass this validation completely for WebSockets
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        return request.getRequestURI().startsWith("/ws");
+    }
+
     @Override
     public void doFilterInternal(
             HttpServletRequest req,
             HttpServletResponse res,
             FilterChain filterChain
-    )throws IOException, ServletException {
+    ) throws IOException, ServletException {
 
         String api = req.getRequestURI();
 
-        if(api.startsWith("/actuator") || api.startsWith("/api/health") ){
-            filterChain.doFilter(req,res);
+        if (api.startsWith("/actuator") || api.startsWith("/api/health") ) {
+            filterChain.doFilter(req, res);
             return;
         }
 
         String clientSecret = req.getHeader("X-Gateway-Secret");
-
 
         if (gatewaySecret == null || !gatewaySecret.equals(clientSecret)) {
             res.setStatus(HttpServletResponse.SC_FORBIDDEN);

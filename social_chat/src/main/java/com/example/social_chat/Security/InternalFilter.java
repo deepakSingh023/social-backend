@@ -24,6 +24,10 @@ public class InternalFilter extends OncePerRequestFilter {
 
         String api = req.getRequestURI();
 
+        if (api.startsWith("/ws")) {
+            return true;
+        }
+
         return !api.startsWith("/api/conversation/");
     }
 

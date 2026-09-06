@@ -4,12 +4,10 @@ import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.cloud.gateway.route.Route; // <-- ADD THIS IMPORT
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
-import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-
 import java.net.URI;
 
 @Component
@@ -23,11 +21,9 @@ public final class LoggingFilters {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
 
-            // Extract internal attributes using WebFlux ServerWebExchangeUtils
-            String routeId = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
-            if (routeId == null) {
-                routeId = "unknown-route";
-            }
+            // FIXED: Natively extract the Route object container first, then pull its string ID
+            Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
+            String routeId = (route != null) ? route.getId() : "unknown-route";
 
             URI targetUriObj = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
             String targetUri = (targetUriObj != null) ? targetUriObj.toString() : "unknown-uri";
