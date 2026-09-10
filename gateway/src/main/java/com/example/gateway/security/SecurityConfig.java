@@ -33,7 +33,7 @@ public class SecurityConfig {
                                 "/api/auth/signup",
                                 "/api/auth/refresh",
                                 "/actuator/**",
-                                "/api/profiles/search/**",
+                                "/api/profiles/search",
                                 "/ws/**"
                         ).permitAll()
                         .anyExchange().authenticated()
