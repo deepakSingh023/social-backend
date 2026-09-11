@@ -95,19 +95,25 @@ public class ViewService {
             );
         }
 
-        feed.addAll(
+        List<Reel> popular =
                 reelRepository.findByCreatedAtLessThanOrderByPopularityScoreDesc(
                         cursorTime,
                         PageRequest.of(0, limit / 4)
-                )
-        );
+                );
 
-        feed.addAll(
+        log.info("POPULAR REELS FOUND = {}", popular.size());
+
+        feed.addAll(popular);
+
+        List<Reel> newest =
                 reelRepository.findByCreatedAtLessThanOrderByCreatedAtDesc(
                         cursorTime,
                         PageRequest.of(0, limit / 4)
-                )
-        );
+                );
+
+        log.info("NEWEST REELS FOUND = {}", newest.size());
+
+        feed.addAll(newest);
 
         Collections.shuffle(feed);
 
@@ -175,6 +181,9 @@ public class ViewService {
                             .getCreatedAt()
                             .toString();
         }
+
+        log.info("FINAL FEED SIZE = {}", uniqueFeed.size());
+        log.info("FINAL FEED IDS = {}", reelIds);
 
         return new FeedResponse(response,nextCursor);
 
