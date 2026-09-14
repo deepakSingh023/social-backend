@@ -2,189 +2,129 @@
 
 ## Overview
 
-The Feed Service is responsible for generating and serving the home feed for users across the platform.
+The Feed Service generates and serves the home feed for users.
 
-The service follows a **Fan-Out-on-Write architecture**, where feed entries are precomputed and stored whenever posts are created or new relationships are established. This allows feed retrieval to remain extremely fast because the expensive relationship calculations occur during writes instead of reads.
+It follows a **Fan-Out-on-Write** architecture. Feed entries are created when posts are created or when relationships change, allowing feed retrieval to use precomputed feed references instead of calculating relationships on every read.
 
-The service acts as the bridge between the Post Service and the Interaction Service and is responsible for maintaining personalized feed entries for every user.
+The service maintains feed entries and coordinates with the Post, Interaction, and Likes services.
 
 ---
 
 ## Responsibilities
 
-The service is responsible for:
-
 * Feed generation
-* Feed distribution
 * Feed retrieval
 * Feed cleanup
+* Post-based feed creation
 * Interaction-based feed creation
 * Post deletion propagation
 * Relationship deletion propagation
 * Feed pagination
 * Feed enrichment with like status
-* Cross-service feed synchronization
 
 ---
 
 ## Architecture
 
-The service follows a Fan-Out-on-Write model.
-
-Instead of generating feeds dynamically whenever a user opens the application, feed entries are created ahead of time.
-
-This shifts computational complexity from read operations to write operations.
-
-Benefits include:
-
-* Fast feed retrieval
-* Predictable read latency
-* Reduced database joins
-* Simplified feed queries
-* Better scalability for read-heavy workloads
-
----
-
-## Data Model
-
-### Feed
-
-Represents a single post visible inside a user's feed.
-
-Stores:
-
-* Feed owner id
-* Author id
-* Post id
-* Creation timestamp
-
-Example:
-
-User A creates a post.
-
-User B follows User A.
-
-Feed Entry:
+Feed generation is event-driven through Kafka.
 
 ```text
-feedOwnerId = UserB
-authorId = UserA
-postId = Post123
+Post Service
+     |
+     | post create/delete event
+     v
+Feed Service
+     |
+     v
+Fan-Out-on-Write
+     |
+     v
+Feed Entries
 ```
 
-When User B opens their feed, the service simply fetches feed entries associated with their user id.
+Relationship changes follow the same pattern:
+
+```text
+Interaction Service
+     |
+     | relationship event
+     v
+Feed Service
+     |
+     v
+Fan-Out-on-Write
+```
+
+Redis is used for event idempotency. Processed Kafka event IDs are stored for 24 hours to prevent duplicate events from repeating feed operations.
 
 ---
 
-## Feed Creation Flow
+## Feed Creation
 
 ### Post Creation
 
-When a new post is created:
+When a post is created:
 
-1. Post Service creates a post
-2. Post Service notifies Feed Service
-3. Feed Service requests all interaction recipients from Interaction Service
-4. Feed entries are generated for every recipient
-5. Feed entries are stored in MongoDB
+1. Post Service stores the post
+2. Post Service creates an Outbox event
+3. The event is published to Kafka
+4. Feed Service consumes the event
+5. Feed Service retrieves the author's recipients from Interaction Service
+6. Feed entries are created for those recipients
 
-Workflow:
-
-```text
-Post Created
-      |
-      v
-Feed Service
-      |
-      v
-Interaction Service
-      |
-      v
-Recipient Users
-      |
-      v
-Feed Entries Created
-```
-
-This ensures future feed reads require no relationship calculations.
-
----
-
-## Interaction-Based Feed Creation
-
-A second feed generation path exists.
-
-When a new relationship is created:
-
-* Friend accepted
-* User followed
-* Follow request accepted
-
-the Interaction Service notifies the Feed Service.
-
-The Feed Service then:
-
-1. Requests historical posts from the author
-2. Batch fetches those posts
-3. Creates feed entries for the new recipient
-
-Example:
+Kafka topic:
 
 ```text
-User A creates 100 posts
-
-User B follows User A
-
-Feed Service fetches:
-- Post1
-- Post2
-- Post3
-...
-- Post100
-
-Feed entries are generated for User B
+post-feed-events-create
 ```
 
-This ensures newly connected users can immediately access existing content.
+### Relationship Creation
+
+When a friendship or follow relationship is created:
+
+1. Interaction Service publishes an event
+2. Feed Service consumes the event
+3. Existing posts from the author are retrieved from Post Service
+4. Feed entries are created for the new recipient
+
+Kafka topic:
+
+```text
+create-feed-interaction
+```
+
+This allows newly connected users to receive existing posts from the relevant author.
 
 ---
 
 ## Feed Retrieval
 
-The service exposes APIs used by the client home page.
+Feed retrieval uses the stored feed references.
 
-Feed retrieval process:
+The service:
 
-1. Fetch feed entries
-2. Resolve post ids
-3. Request full post metadata from Post Service
-4. Request like status from Likes Service
-5. Construct final feed response
-
-Workflow:
+1. Fetches feed entries
+2. Retrieves the referenced posts from Post Service
+3. Retrieves the user's like status from Likes Service
+4. Builds the final feed response
 
 ```text
-Feed Documents
-      |
-      v
+Feed Entries
+     |
+     v
 Post Service
-      |
-      v
-Full Post Data
-      |
-      v
+     |
+     v
+Post Data
+     |
+     v
 Likes Service
-      |
-      v
-Like Status
-      |
-      v
-Final Feed Response
+     |
+     v
+Feed Response
 ```
 
-The feed service never stores complete post content.
-
-Instead it stores lightweight references and enriches them during reads.
+The Feed Service stores references rather than complete post documents.
 
 ---
 
@@ -192,44 +132,52 @@ Instead it stores lightweight references and enriches them during reads.
 
 ### Post Deletion
 
-When a post is deleted:
+Post deletion is propagated through Kafka.
 
-1. Post Service notifies Feed Service
-2. Feed Service removes all feed entries referencing that post
+Topic:
 
-This prevents orphaned feed records.
+```text
+post-feed-events-delete
+```
+
+The Feed Service consumes the event and removes feed entries referencing the deleted post.
+
+### Relationship Deletion
+
+Relationship deletion is also propagated through Kafka.
+
+Topic:
+
+```text
+delete-feed-interaction
+```
+
+The Feed Service removes feed entries belonging to the affected author-recipient relationship.
 
 ---
 
-### Interaction Deletion
+## Kafka Event Idempotency
 
-When a friendship or follow relationship is removed:
+Kafka consumers use Redis to prevent duplicate processing.
 
-1. Interaction Service notifies Feed Service
-2. Feed Service removes all feed entries associated with that author-recipient relationship
+For each event:
 
-Example:
+1. Redis is checked using the event ID
+2. Already processed events are ignored
+3. The feed operation is executed
+4. The event ID is stored in Redis for 24 hours
 
-```text
-User B unfollows User A
-
-Delete:
-
-feedOwnerId = UserB
-authorId = UserA
-```
-
-All content from User A disappears from User B's feed.
+This handles Kafka's at-least-once delivery behavior and prevents unnecessary repeated feed operations.
 
 ---
 
 ## Batch Processing
 
-The service performs feed generation in batches.
+Feed generation uses batched service calls.
 
 ### Interaction Fetching
 
-Recipients are fetched from Interaction Service using cursor pagination.
+Recipients are fetched using cursor pagination.
 
 Batch size:
 
@@ -237,13 +185,9 @@ Batch size:
 100 users per request
 ```
 
-This prevents large relationship graphs from exhausting memory.
-
----
-
 ### Historical Post Fetching
 
-When new interactions are created, posts are fetched from Post Service in batches.
+When a relationship is created, posts are fetched from Post Service in batches.
 
 Batch size:
 
@@ -251,48 +195,32 @@ Batch size:
 100 posts per request
 ```
 
-This allows the service to efficiently process users with large content histories.
-
 ---
 
 ## Cursor Pagination
 
 Feed retrieval uses cursor pagination.
 
-Cursor consists of:
+The cursor contains:
 
 ```text
 createdAt
 feedId
 ```
 
-Pagination query:
+The next page is selected using the timestamp and ID ordering.
 
-```text
-(createdAt < cursorCreatedAt)
-OR
-(createdAt == cursorCreatedAt
- AND id < cursorId)
-```
-
-Benefits:
-
-* Stable ordering
-* Infinite scrolling support
-* No offset performance degradation
-* Scales efficiently for large feeds
+This provides stable ordering and avoids the performance problems associated with large offset-based queries.
 
 ---
 
 ## Feed Enrichment
 
-Feed entries only store references.
-
-Before returning data:
+Feed documents contain lightweight references.
 
 ### Post Service
 
-Used to retrieve:
+Provides:
 
 * Caption
 * Images
@@ -303,195 +231,66 @@ Used to retrieve:
 
 ### Likes Service
 
-Used to retrieve:
+Provides:
 
-* Current user like status
-
-This allows feed documents to remain lightweight while still providing rich responses.
+* Current user's like status
 
 ---
 
-## External Service Integrations
+## Reliability
 
-### Interaction Service
+Resilience4j Retry and Circuit Breaker are used for the important synchronous data-fetch operations involved in feed generation.
 
-Used for:
-
-* Recipient discovery
-* Relationship-based feed generation
-
-Operations:
-
-* Batch interaction retrieval
-
----
-
-### Post Service
-
-Used for:
-
-* Feed post retrieval
-* Historical post retrieval
-
-Operations:
-
-* Fetch post metadata
-* Fetch author posts
-
----
-
-### Likes Service
-
-Used for:
-
-* Like status enrichment
-
-Operations:
-
-* Bulk like lookup
-
----
-
-## Reliability Features
-
-Cross-service communication is protected using Resilience4j.
-
-Features include:
-
-* Retry
-* Circuit Breaker
-* Fallback methods
-
-Applied to:
+They are applied to:
 
 * Interaction Service calls
 * Post Service calls
 
----
+If Interaction Service fails, the fallback returns an empty recipient list.
 
-### Interaction Fetch Fallback
+If Post Service fails, the fallback returns an empty post list.
 
-If Interaction Service becomes unavailable:
-
-```text
-Return empty recipient list
-```
-
-Feed generation safely terminates.
+This allows feed generation to terminate safely when a downstream service is temporarily unavailable.
 
 ---
 
-### Post Fetch Fallback
+## Security
 
-If Post Service becomes unavailable:
+JWT authentication and browser CORS are handled by the API Gateway.
 
-```text
-Return empty post list
-```
+The Feed Service does not perform JWT validation or CORS handling.
 
-Interaction feed generation safely terminates.
+The service uses:
 
----
+* `GatewayHeaderFilter` to validate the Gateway secret
+* `InternalFilter` for internal service protection
 
-## Asynchronous Processing
-
-Feed creation operations execute asynchronously.
-
-Asynchronous tasks include:
-
-* Feed generation after post creation
-* Feed generation after relationship creation
-* Feed cleanup after post deletion
-* Feed cleanup after interaction deletion
-
-This prevents expensive feed operations from impacting API response times.
-
----
-
-## Scalability Characteristics
-
-### Read Path
-
-Feed reads are extremely lightweight.
-
-Operations:
-
-1. Query feed entries
-2. Resolve post data
-3. Return results
-
-Complexity:
-
-```text
-O(page_size)
-```
-
----
-
-### Write Path
-
-Feed writes are more expensive.
-
-Operations:
-
-1. Discover recipients
-2. Generate feed entries
-3. Persist feed records
-
-Complexity:
-
-```text
-O(number_of_recipients)
-```
-
-This trade-off is intentional because social platforms typically experience significantly more reads than writes.
+These provide application-level protection against direct downstream access.
 
 ---
 
 ## Observability
 
-The service includes custom observability components.
+### Distributed Tracing
 
-### Request Tracing
+Tracing is handled using OpenTelemetry.
 
-Every request receives a unique trace identifier.
+The service uses W3C trace context propagation and exports traces to the OpenTelemetry Collector, which forwards them to Jaeger.
 
-Features:
-
-* Distributed tracing
-* Log correlation
-* Easier debugging
-
----
-
-### Structured Logging
-
-Controller requests are automatically logged through AOP.
-
-Captured information:
-
-* Controller
-* API
-* Status
-* Latency
-
----
+Kafka listener observation is enabled for asynchronous event processing.
 
 ### Metrics
 
-Micrometer metrics are collected for all APIs.
+Spring Boot Actuator and Micrometer provide the main service metrics.
 
-Metrics include:
+Metrics are exposed through the Prometheus endpoint and collected by Prometheus for visualization in Grafana.
 
-* Request count
-* Success count
-* Error count
-* API latency
-* P50 latency
-* P95 latency
-* P99 latency
+A custom Spring AOP aspect additionally records method-level metrics:
 
-Metrics are exposed through Spring Boot Actuator.
+* `http.api.latency`
+* `http.api.count`
+
+These include the method, service class, status, and latency percentiles.
 
 ---
 
@@ -503,12 +302,15 @@ Metrics are exposed through Spring Boot Actuator.
 * MongoDB
 * Spring Security
 * OpenFeign
+* Apache Kafka
+* Spring Kafka
+* Redis
 * Resilience4j
 * Spring AOP
 * Micrometer
-* Spring Actuator
+* Spring Boot Actuator
+* OpenTelemetry
 * Async Processing
-* MDC Tracing
 
 ---
 
@@ -516,41 +318,31 @@ Metrics are exposed through Spring Boot Actuator.
 
 ### Fan-Out-on-Write
 
+Feed entries are generated during writes instead of during feed reads.
+
 Advantages:
 
-* Extremely fast reads
 * Simple feed queries
-* Predictable latency
+* Predictable read processing
+* No relationship calculation during every feed request
 
 Trade-offs:
 
-* More expensive writes
-* Additional storage requirements
-* Feed duplication across users
+* More work during post creation and relationship changes
+* Additional feed storage
 
-The platform prioritizes read performance because feed consumption occurs significantly more frequently than content creation.
+### Feed References
 
----
+The service stores post references instead of complete post data.
 
-### Feed References Instead of Full Posts
-
-The service stores only references rather than full post content.
-
-Advantages:
-
-* Smaller feed documents
-* Lower storage usage
-* Easier post updates
-
-Trade-offs:
-
-* Additional service calls during reads
-* Dependency on Post Service availability
+This keeps feed documents small but requires calls to Post and Likes services when building the final response.
 
 ---
 
 ## Summary
 
-The Feed Service is the content distribution layer of the platform. By implementing a Fan-Out-on-Write architecture, the service precomputes personalized feeds whenever posts are created or relationships change.
+The Feed Service implements the platform's Fan-Out-on-Write feed system.
 
-This design enables extremely fast feed retrieval while supporting scalable content distribution, relationship-driven visibility, asynchronous processing, fault-tolerant service communication, cursor pagination, structured observability, and efficient integration with the Post, Likes, and Interaction services.
+Post and relationship changes are propagated through Kafka, while Redis provides event idempotency. Feed generation retrieves recipients and historical posts in batches, and feed reads enrich stored post references with data from Post and Likes services.
+
+Resilience4j protects the important synchronous data-fetch operations, while OpenTelemetry and Actuator/Micrometer provide tracing and metrics.
