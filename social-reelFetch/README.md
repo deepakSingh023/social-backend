@@ -10,8 +10,6 @@ The service does not store reels, manage popularity, calculate interests, or pro
 
 Instead, it retrieves a user's interests from the Interest Service and forwards them to the Reel Service, which generates the final personalized reel feed.
 
-This separation keeps recommendation orchestration independent from both interest management and reel storage.
-
 ---
 
 ## Responsibilities
@@ -37,10 +35,6 @@ The service is not responsible for:
 ---
 
 ## Architecture
-
-The Reel Fetch Service sits between the client and the recommendation ecosystem.
-
-Workflow:
 
 ```text
 User Opens Reel Feed
@@ -77,31 +71,12 @@ The service acts as an orchestration layer rather than a business logic layer.
 When a user requests reels:
 
 1. Reel Fetch Service receives the request
-2. User identity is extracted from JWT authentication
-3. Interest Service is called
-4. User interest profile is retrieved
-5. Feed request is constructed
-6. Reel Service receives the request
-7. Reel Service generates a personalized feed
-8. Feed is returned to the client
-
-Workflow:
-
-```text
-Request Feed
-      |
-      v
-Fetch User Interests
-      |
-      v
-Build Recommendation Request
-      |
-      v
-Call Reel Service
-      |
-      v
-Return Feed
-```
+2. Interest Service is called
+3. User interest profile is retrieved
+4. Feed request is constructed
+5. Reel Service receives the request
+6. Reel Service generates a personalized feed
+7. Feed is returned to the client
 
 ---
 
@@ -113,30 +88,14 @@ Return Feed
 GET /api/reels/feed
 ```
 
-Parameters:
-
 | Parameter | Required | Description               |
 | --------- | -------- | ------------------------- |
 | cursor    | No       | Pagination cursor         |
 | limit     | No       | Number of reels to return |
 
-Authentication:
-
-```text
-JWT Required
-```
-
-Purpose:
-
-* Retrieve personalized reels
-* Support infinite scrolling
-* Forward recommendation requests
-
 ---
 
 ## Request Processing
-
-The service performs the following sequence:
 
 ### Step 1
 
@@ -227,7 +186,7 @@ FeedResponse
 
 Pagination is delegated to the Reel Service.
 
-The Reel Fetch Service simply forwards:
+The Reel Fetch Service forwards:
 
 ```text
 cursor
@@ -236,11 +195,7 @@ limit
 
 to the recommendation engine.
 
-Advantages:
-
-* Stateless orchestration
-* Simple implementation
-* Centralized recommendation pagination
+The service remains stateless and does not maintain pagination state.
 
 ---
 
@@ -267,26 +222,15 @@ Logged information includes:
 * Response body
 * Service failure details
 
-This simplifies debugging and monitoring.
-
 ---
 
 ## Security
 
-The service communicates with internal services using service-to-service authentication.
+Security and JWT authentication are handled by the API Gateway.
 
-Internal requests include:
+The Reel Fetch Service does not perform JWT authentication or CORS handling.
 
-```text
-X-SECRET-TOKEN
-```
-
-This token is forwarded when calling:
-
-* Interest Service
-* Reel Service
-
-External users access the service through JWT authentication.
+The service contains a `GatewayHeaderFilter` that validates the Gateway secret before allowing requests to proceed.
 
 ---
 
@@ -302,17 +246,34 @@ Fetch Interest
 Request Feed
 ```
 
-Complexity:
-
-```text
-O(1)
-```
-
 No database access occurs inside this service.
 
 No recommendation calculations occur inside this service.
 
 This makes horizontal scaling straightforward.
+
+---
+
+## Observability
+
+### Distributed Tracing
+
+Tracing is handled using OpenTelemetry.
+
+The service uses W3C trace context propagation and exports traces to the OpenTelemetry Collector, which forwards them to Jaeger.
+
+### Metrics
+
+Spring Boot Actuator and Micrometer provide the main service metrics.
+
+Metrics are exposed through the Prometheus endpoint and collected by Prometheus for visualization in Grafana.
+
+A custom Spring AOP metric aspect additionally records service-layer method metrics:
+
+* `http.api.latency`
+* `http.api.counter`
+
+These metrics track method execution latency and success/error status.
 
 ---
 
@@ -322,7 +283,10 @@ This makes horizontal scaling straightforward.
 * Spring Boot
 * Spring Security
 * OpenFeign
-* Spring Aop
+* Spring AOP
+* Spring Boot Actuator
+* Micrometer
+* OpenTelemetry
 
 ---
 
@@ -353,18 +317,7 @@ Reel Fetch Service
      +--> Reel Service
 ```
 
-Advantages:
-
-* Reduced frontend complexity
-* Centralized recommendation workflow
-* Easier service evolution
-* Better separation of concerns
-
-Trade-off:
-
-* Additional network hop
-
-The architectural simplicity outweighs the small latency increase.
+This keeps the recommendation workflow in one place and reduces frontend complexity.
 
 ---
 
@@ -372,13 +325,9 @@ The architectural simplicity outweighs the small latency increase.
 
 Interest management is separated from reel generation.
 
-Advantages:
+Interest Service manages user interests while Reel Service handles reel recommendation logic.
 
-* Independent scaling
-* Clear service boundaries
-* Easier recommendation experimentation
-
-This allows interest algorithms to evolve without modifying reel retrieval logic.
+This keeps the service boundaries separate and allows each component to evolve independently.
 
 ---
 
@@ -388,4 +337,4 @@ The Reel Fetch Service acts as the recommendation orchestration layer of the ree
 
 It retrieves user interests from the Interest Service, constructs recommendation requests, forwards them to the Reel Service, and returns personalized reel feeds to clients.
 
-By separating recommendation orchestration from interest management and reel storage, the architecture remains modular, scalable, and easier to maintain as the recommendation system evolves.
+The service remains stateless and focused on orchestration, while authentication is handled by the API Gateway and recommendation logic remains in Reel Service.
