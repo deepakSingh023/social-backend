@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Like & Comment Service is responsible for managing engagement across the platform. It handles likes for posts, reels, and comments while also providing support for comments and nested replies.
+The Like & Comment Service manages engagement across the platform.
 
-The service acts as a shared engagement layer used by multiple services. Post Service and Reel Service rely on it for like tracking, while Profile Service communicates with it to keep denormalized user information up to date.
+It handles likes for posts, reels, and comments, as well as comments and nested replies.
 
-In addition to storing likes and comments, the service updates engagement counters and contributes user interaction signals used by the reel recommendation system.
+The service is used by Post Service, Reel Service, Profile Service, and other services for engagement-related operations.
 
 ---
 
@@ -77,8 +77,6 @@ Supported target types:
 * REEL
 * COMMENT
 
-This keeps the engagement system simple while supporting multiple content types.
-
 ---
 
 ### Comment Hierarchy
@@ -102,25 +100,54 @@ The service maintains denormalized reply counts to avoid expensive aggregation q
 
 ### Feed Optimization
 
-Several services need to know whether content has been liked by a user.
+The service provides batch liked-status APIs so other services can check multiple posts, reels, or comments without making individual requests.
 
-Instead of making individual requests for every post or reel, the service provides a batch liked-status API.
-
-This API is used by:
+Used by:
 
 * Post Service
 * Reel Service
-* Friend Feed Service
+* Feed Service
 
-This reduces service-to-service traffic and avoids N+1 query patterns during feed generation.
+This reduces service-to-service traffic and avoids N+1 request patterns.
 
 ---
 
 ### Interest Signal Generation
 
-When a user likes a reel, the service not only updates engagement counts but also sends a signal to the Reel Interest Service.
+When a user likes a reel, the service also generates an interaction signal used by the reel recommendation system.
 
-This interaction helps build user interest profiles that are later used for personalized reel recommendations.
+---
+
+## Profile Avatar Updates
+
+The service consumes profile denormalization events from Profile Service through Kafka.
+
+Topic:
+
+```text
+profile-comment-events
+```
+
+When a user's avatar changes:
+
+1. Profile Service publishes the profile update event
+2. Like & Comment Service consumes the event
+3. Redis is checked using the event ID
+4. Duplicate events are ignored
+5. Existing comments belonging to the user are updated
+6. The event ID is stored in Redis for 24 hours
+
+Redis idempotency prevents duplicate Kafka deliveries from causing unnecessary MongoDB writes.
+
+---
+
+## Kafka
+
+The service acts as a Kafka consumer for profile denormalization events.
+
+Kafka is used for asynchronous propagation of profile avatar changes rather than requiring Profile Service to synchronously update every comment.
+
+The service uses Spring Kafka with W3C trace context propagation for asynchronous processing.
 
 ---
 
@@ -138,16 +165,27 @@ Used when fetching a single post or reel.
 
 ### Avatar Denormalization
 
-Used by Profile Service whenever a user updates their profile picture.
-
-The service updates all existing comments belonging to that user to keep profile information consistent.
+Updates comments when a user's profile avatar changes.
 
 ---
 
+## Security
+
+JWT authentication and browser CORS are handled by the API Gateway.
+
+The Like & Comment Service does not independently validate JWTs or handle browser CORS.
+
+The service uses an application-level `GatewayHeaderFilter` to verify the gateway secret on requests coming through the Gateway.
+
+It also contains an `InternalFilter` for service-level internal protection.
+
+These filters provide application-level protection against direct downstream access. Network-level isolation can additionally be applied through private service networking, firewall rules, or other deployment-level controls.
+
+---
 
 ## Resilience
 
-Several operations are performed asynchronously to keep user requests fast.
+Several operations are performed asynchronously so that non-critical downstream work does not block the original request.
 
 Examples include:
 
@@ -156,50 +194,35 @@ Examples include:
 * Interest tracking updates
 * Avatar synchronization
 
-Failures in downstream services do not block the original user request.
-
-This approach improves responsiveness and isolates failures between services.
+This keeps user-facing operations independent from non-critical downstream processing.
 
 ---
 
 ## Observability
 
-The service includes tracing, metrics, and structured logging.
+### Distributed Tracing
 
-### Tracing
+Tracing is handled using OpenTelemetry.
 
-A unique trace ID is generated for every request and stored using MDC.
+The service uses W3C trace context propagation and exports traces to the OpenTelemetry Collector, which forwards them to Jaeger.
 
-This makes it easier to follow a request through logs.
+Kafka listener observation is also enabled so asynchronous Kafka processing participates in the tracing pipeline.
+
+---
 
 ### Metrics
 
-Micrometer metrics are collected for:
+Spring Boot Actuator and Micrometer provide the service metrics.
+
+Metrics are exposed through the Prometheus endpoint and collected by Prometheus for visualization in Grafana.
+
+Metrics include:
 
 * Request count
-* Success count
-* Error count
-* API latency
-
-Percentiles include:
-
-* P50
-* P95
-* P99
-
-Metrics are exposed through Spring Boot Actuator.
-
-### Logging
-
-Controller requests are logged with:
-
-* Controller name
-* API name
 * Request latency
-* Success status
-* Error information
-
-This helps simplify debugging and performance analysis.
+* JVM metrics
+* Process/system metrics
+* Application metrics
 
 ---
 
@@ -239,15 +262,18 @@ updatedAt
 * Spring Boot
 * Spring Security
 * MongoDB
+* Redis
+* Apache Kafka
+* Spring Kafka
 * OpenFeign
 * Micrometer
 * Spring Boot Actuator
-* JWT Authentication
+* OpenTelemetry
 
 ---
 
 ## Summary
 
-The Like & Comment Service provides the engagement layer of the platform. It centralizes likes, comments, and replies while exposing efficient APIs for feed generation and content retrieval.
+The Like & Comment Service provides the engagement layer for posts, reels, and comments.
 
-By combining denormalization, asynchronous updates, internal service communication, and observability features, the service remains lightweight, scalable, and responsive while supporting engagement-heavy workloads across the platform.
+It combines a unified like model, nested comments, denormalized counters, batch APIs, asynchronous Kafka-based profile updates, and Redis-based consumer idempotency to support the rest of the platform.
