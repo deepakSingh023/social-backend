@@ -2,23 +2,23 @@
 
 ## Overview
 
-The Reel Service manages short-form video content, reel discovery, semantic tagging, and recommendation signals. It stores reel metadata, manages media uploads, tracks engagement metrics, and generates personalized reel feeds based on user interests and reel popularity.
+The Reel Service manages short-form video content, reel discovery, semantic tagging, and recommendation signals.
 
-The service acts as the content source for the recommendation system and works closely with the Interest Service to improve feed relevance over time.
+It stores reel metadata, manages media uploads, tracks engagement metrics, and generates personalized reel feeds based on user interests and reel popularity.
 
 ---
 
 ## Responsibilities
 
-- Create and delete reels
-- Manage reel video uploads
-- Generate personalized reel feeds
-- Track reel views
-- Calculate reel popularity scores
-- Store raw and semantic tags
-- Provide reel data for profile pages
-- Handle avatar denormalization
-- Maintain engagement counters
+* Create and delete reels
+* Manage reel video uploads
+* Generate personalized reel feeds
+* Track reel views
+* Calculate reel popularity scores
+* Store raw and semantic tags
+* Provide reel data for profile pages
+* Handle avatar denormalization
+* Maintain engagement counters
 
 ---
 
@@ -26,35 +26,33 @@ The service acts as the content source for the recommendation system and works c
 
 ### Reel Creation
 
-The service supports two upload workflows:
+The service supports two upload workflows.
 
 #### Backend Upload
 
-- User uploads a video through the API
-- Video validation is performed
-- Video is compressed before storage
-- Media is uploaded to Cloudflare R2
-- Reel metadata is saved in MongoDB
+* User uploads a video through the API
+* Video validation is performed
+* Video is compressed before storage
+* Media is uploaded to Cloudflare R2
+* Reel metadata is saved in MongoDB
 
 #### Frontend Direct Upload
 
-- Client requests a presigned upload URL
-- Frontend uploads directly to Cloudflare R2
-- Metadata is submitted separately after upload
+* Client requests a presigned upload URL
+* Frontend uploads directly to Cloudflare R2
+* Metadata is submitted separately after upload
 
-This approach reduces backend bandwidth usage and improves upload performance.
+This reduces backend bandwidth usage and upload processing.
 
 ---
 
 ### Semantic Tag Resolution
 
-Each reel stores two types of tags:
+Each reel stores two types of tags.
 
 #### Raw Tags
 
 Tags directly provided by the creator.
-
-Example:
 
 ```text
 gym
@@ -66,63 +64,39 @@ fitness
 
 Normalized tags used by the recommendation system.
 
-Example:
-
 ```text
 fitness
 ```
 
 When a raw tag has no mapping:
 
-- A new mapping entry is created automatically
-- The semantic tag remains empty
-- Semantic mapping can be added later
-
-This allows new tags to enter the system without breaking recommendation functionality.
+* A new mapping entry is created automatically
+* The semantic tag remains empty
+* The mapping can be added later
 
 ---
 
 ### Personalized Reel Feed
 
-Feed generation combines multiple content sources:
+Feed generation combines:
 
-#### Interest-Based Content
+* Interest-based content
+* Popular content
+* Recent content
 
-Reels matching the user's strongest semantic interests.
-
-#### Popular Content
-
-Reels ranked by popularity score.
-
-#### Recent Content
-
-Recently uploaded reels to keep the feed fresh.
-
-Results are:
-
-- Combined
-- Shuffled
-- Deduplicated
-- Limited to the requested page size
+Results are combined, shuffled, deduplicated, and limited to the requested page size.
 
 ---
 
 ### Popularity Scoring
 
-Popularity is recalculated whenever engagement changes.
-
-Formula:
+Popularity is recalculated when engagement changes.
 
 ```text
 Popularity = (Views + Likes × 5) / Hours^1.5
 ```
 
-Characteristics:
-
-- Rewards engagement
-- Gives more weight to likes than views
-- Applies time decay
-- Prevents old content from permanently dominating recommendations
+The formula gives additional weight to likes and applies time decay to older content.
 
 ---
 
@@ -130,50 +104,51 @@ Characteristics:
 
 Every reel view:
 
-- Increments the view counter
-- Recalculates popularity score
-- Returns reel semantic tags
+* Increments the view counter
+* Recalculates popularity
+* Returns the reel's semantic tags
 
-The returned semantic tags are used by the Interest Service to update user interests.
+The semantic tags are used by the View Service to update user interests.
 
 ---
 
 ### Interest Integration
 
-The service works closely with the Interest Service.
-
-User actions such as:
-
-- Viewing reels
-- Liking reels
-
-are translated into interest signals.
-
-These signals help build user preference profiles and improve future feed recommendations.
+The Reel Service works with the Interest and View services to support recommendation signals generated from reel engagement.
 
 ---
 
 ### Profile Integration
 
-During reel creation, the service retrieves profile information from the Profile Service.
+During reel creation, profile information is retrieved from Profile Service.
 
 Stored denormalized data includes:
 
-- Username
-- Avatar URL
+* Username
+* Avatar URL
 
-This reduces repeated profile lookups during feed generation.
+This avoids repeated profile lookups when reels are retrieved.
 
 ---
 
 ### Avatar Denormalization
 
-When a user updates their profile picture:
+Profile avatar changes are propagated asynchronously through Kafka.
 
-1. Profile Service sends a denormalization request.
-2. All reels belonging to that user update their stored avatar.
+Topic:
 
-This ensures profile updates are reflected across existing content.
+```text
+profile-reel-events
+```
+
+When an event is received:
+
+1. Reel Service checks Redis using the event ID
+2. Duplicate events are ignored
+3. Reels belonging to the user are updated
+4. The event ID is stored in Redis for 24 hours
+
+The avatar update is naturally idempotent because the stored value is overwritten, while Redis prevents unnecessary repeated MongoDB writes from duplicate Kafka deliveries.
 
 ---
 
@@ -181,12 +156,12 @@ This ensures profile updates are reflected across existing content.
 
 The service maintains denormalized counters for:
 
-- Likes
-- Comments
-- Views
-- Popularity Score
+* Likes
+* Comments
+* Views
+* Popularity Score
 
-Counters are updated asynchronously by other services.
+Counters are updated by the relevant services.
 
 ---
 
@@ -196,50 +171,48 @@ The service exposes internal APIs used by other services.
 
 ### Feed Retrieval
 
-Used by the Reel Feed Service to fetch personalized reels.
+Used by Reel Fetch Service to retrieve personalized reels.
 
 ### Avatar Denormalization
 
-Used by the Profile Service when a user updates their profile picture.
+Profile updates are propagated through Kafka and applied to existing reels.
 
 ### View Updates
 
 Used to update:
 
-- View counts
-- Popularity scores
-- Interest signals
+* View counts
+* Popularity scores
+* Semantic tags for interest processing
 
 ### Engagement Counter Updates
 
-Used by the Likes & Comments Service to update:
+Used by Likes & Comments Service to update:
 
-- Like counts
-- Comment counts
-
-without performing expensive aggregation queries.
+* Like counts
+* Comment counts
 
 ---
 
 ## Storage
 
-### reels Collection
+### `reels` Collection
 
 Stores:
 
-- Reel metadata
-- Video URLs
-- User information
-- Tags
-- Engagement statistics
-- Popularity scores
+* Reel metadata
+* Video URLs
+* User information
+* Tags
+* Engagement statistics
+* Popularity scores
 
-### tag_mappings Collection
+### `tag_mappings` Collection
 
 Stores mappings between:
 
-- Raw creator tags
-- Semantic recommendation tags
+* Raw creator tags
+* Semantic recommendation tags
 
 ---
 
@@ -247,11 +220,11 @@ Stores mappings between:
 
 Cloudflare R2 is used for:
 
-- Reel video storage
-- Presigned uploads
-- Media delivery
+* Reel video storage
+* Presigned uploads
+* Media delivery
 
-Videos are stored separately from application data to improve scalability.
+Videos are stored separately from application data.
 
 ---
 
@@ -259,68 +232,77 @@ Videos are stored separately from application data to improve scalability.
 
 The Reel Service communicates with:
 
-- Profile Service
-- Likes & Comments Service
-- Interest Service
+* Profile Service
+* Likes & Comments Service
+* Interest Service
 
-Profile information is denormalized to reduce cross-service requests during feed generation.
+It uses synchronous service-to-service communication where an immediate response is required and Kafka for profile avatar denormalization.
+
+---
+
+## Reliability
+
+Resilience4j Retry and Circuit Breaker are used for relevant cross-service operations.
+
+This provides retry handling for temporary failures and prevents repeated calls to unavailable dependencies.
+
+---
+
+## Security
+
+JWT authentication and browser CORS are handled by the API Gateway.
+
+The Reel Service does not independently validate JWTs or handle CORS.
+
+The service uses:
+
+* `GatewayHeaderFilter` to validate requests coming through the Gateway
+* `InternalFilter` for internal service requests
+
+These provide application-level protection at the service boundary.
 
 ---
 
 ## Observability
 
-The service includes observability features for monitoring and debugging.
+### Distributed Tracing
 
-### Tracing
+Tracing is handled using OpenTelemetry.
 
-Each request receives a unique trace ID using MDC.
+The service uses W3C trace context propagation and exports traces to the OpenTelemetry Collector, which forwards them to Jaeger.
 
 ### Metrics
 
-Micrometer metrics are collected for:
+Spring Boot Actuator and Micrometer provide the main service metrics.
 
-- Request count
-- Request latency
-- Success rate
-- Error rate
+Metrics are exposed through the Prometheus endpoint and scraped by Prometheus for visualization in Grafana.
 
-Latency percentiles:
+A custom Spring AOP aspect additionally records service-method metrics:
 
-- P50
-- P95
-- P99
+* `http.api.latency`
+* `http.api.count`
 
-### Logging
-
-Structured logs include:
-
-- Controller name
-- API name
-- Request status
-- Processing latency
-
-### Actuator
-
-Spring Boot Actuator exposes:
-
-- Health endpoints
-- Metrics
-- Runtime information
+These track method execution latency and success/error status.
 
 ---
 
 ## Tech Stack
 
-- Java 17
-- Spring Boot
-- Spring Security
-- MongoDB
-- Cloudflare R2
-- AWS S3 SDK
-- OpenFeign
-- Micrometer
-- Spring Actuator
-- Aspect-Oriented Programming (AOP)
+* Java 17
+* Spring Boot
+* Spring Security
+* MongoDB
+* Redis
+* Apache Kafka
+* Spring Kafka
+* Cloudflare R2
+* AWS S3 SDK
+* OpenFeign
+* Resilience4j
+* Micrometer
+* Spring Boot Actuator
+* OpenTelemetry
+* Spring AOP
 
 ---
 
@@ -333,10 +315,12 @@ When new raw tags appear:
 1. The raw tag is stored automatically.
 2. Semantic mappings must be added manually.
 
-A future improvement would be AI-assisted tag classification to automatically generate semantic mappings and reduce manual maintenance.
+A future improvement would be automated tag classification to reduce manual maintenance.
 
 ---
 
 ## Summary
 
-The Reel Service is responsible for reel creation, engagement tracking, semantic tagging, popularity calculation, and personalized feed generation. It combines semantic interests, popularity-based ranking, and content freshness to provide a lightweight recommendation system while remaining simple enough to evolve as the platform grows.
+The Reel Service manages reel content, media storage, engagement data, semantic tags, popularity scoring, and personalized feed generation.
+
+It uses denormalized profile data, Resilience4j for relevant service calls, and Kafka-based avatar propagation to keep reel data synchronized across the platform.
