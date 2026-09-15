@@ -154,7 +154,7 @@ Used for:
 
 ### Dedicated View Service
 
-Instead of allowing multiple services to directly update interests, all engagement events pass through a centralized View Service.
+Instead of allowing multiple services to directly update interests, engagement events pass through a centralized View Service.
 
 Benefits:
 
@@ -194,55 +194,42 @@ Responsible for:
 
 ---
 
+## Security
+
+Authentication and browser CORS are handled by the API Gateway.
+
+The View Service does not perform JWT authentication or CORS handling.
+
+The service uses a `GatewayHeaderFilter` to validate the Gateway secret.
+
+An `InternalFilter` is also used for internal service protection.
+
+These filters provide application-level protection at the service boundary. Stronger network-level isolation can be applied separately through deployment and networking controls.
+
+---
+
 ## Observability
 
-The service includes the same observability stack used across the platform.
-
-### Structured Logging
-
-Logs API execution details including:
-
-* Controller
-* Endpoint
-* Status
-* Latency
-
-Example:
-
-```text
-controller=ViewController
-api=createView
-status=SUCCESS
-latencyMs=34
-```
+The service uses Spring Boot Actuator, Micrometer, OpenTelemetry, Prometheus, Grafana, and Jaeger.
 
 ### Distributed Tracing
 
-Each request receives a unique trace identifier.
+Tracing is handled through OpenTelemetry.
 
-```text
-traceId=8a3f2d8b-1234-5678-90ab-cdef12345678
-```
-
-This enables request tracking across services.
+The service uses W3C trace context propagation and exports traces to the OpenTelemetry Collector, which forwards them to Jaeger.
 
 ### Metrics
 
-Micrometer metrics are collected for:
+Spring Boot Actuator and Micrometer provide the main service metrics.
 
-* Request count
-* Success rate
-* Error rate
-* API latency
+Metrics are exposed through the Prometheus endpoint and scraped by Prometheus for visualization in Grafana.
 
-Example metrics:
+A custom Spring AOP metric aspect additionally records service-layer method metrics:
 
-```text
-http.api.count
-http.api.latency
-```
+* `http.api.latency`
+* `http.api.count`
 
-Metrics are exposed through Spring Boot Actuator and can be visualized using Prometheus and Grafana.
+These metrics record method execution latency and success/error status.
 
 ---
 
@@ -254,13 +241,14 @@ Metrics are exposed through Spring Boot Actuator and can be visualized using Pro
 * Spring AOP
 * OpenFeign
 * Micrometer
-* Spring Actuator
+* Spring Boot Actuator
+* OpenTelemetry
 
 ---
 
 ## Role in Recommendation Architecture
 
-The View Service is a critical component of the reel recommendation pipeline.
+The View Service is a component of the reel recommendation pipeline.
 
 ```text
 User Action
@@ -282,4 +270,4 @@ Reel Fetch Service
 Personalized Reel Feed
 ```
 
-By connecting engagement events with interest updates, the service enables personalized reel recommendations across the platform.
+By connecting engagement events with interest updates, the service provides the recommendation system with the user interest signals required for personalized reel recommendations.
