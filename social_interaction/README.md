@@ -2,15 +2,13 @@
 
 ## Overview
 
-The Social Interaction Service manages user relationships across the platform. It is responsible for friendships, followers, follow requests, friend requests, interaction tracking, feed relationship generation, profile denormalization, and cross-service communication with Profile, Post, Counter, and Chat services.
+The Social Interaction Service manages user relationships across the platform. It handles friendships, followers, follow requests, friend requests, interaction tracking, feed relationship generation, profile denormalization, and cross-service communication with Profile, Counter, Feed, and Chat services.
 
-The service acts as the relationship layer of the platform and determines how users are connected to one another. These connections are later used by the Feed Service to distribute content efficiently without repeatedly querying multiple relationship collections.
+The service acts as the relationship layer of the platform and maintains the interaction data used by the Feed Service for efficient content distribution.
 
 ---
 
 ## Responsibilities
-
-The service is responsible for:
 
 * Friend management
 * Follower management
@@ -20,7 +18,7 @@ The service is responsible for:
 * Relationship status checks
 * Feed interaction generation
 * Profile denormalization
-* Friend conversation creation
+* Friend conversation synchronization
 * Counter synchronization
 * Feed synchronization
 
@@ -42,8 +40,6 @@ Stores:
 
 Friendships are stored as a single document and queried bidirectionally.
 
----
-
 ### Friend Requests
 
 Represents pending friendship requests.
@@ -56,9 +52,7 @@ Stores:
 * Username snapshots
 * Request timestamp
 
-Requests are automatically converted into friendships when accepted.
-
----
+Requests are converted into friendships when accepted.
 
 ### Followers
 
@@ -72,9 +66,7 @@ Stores:
 * Username snapshots
 * Creation timestamp
 
-Used for both public account follows and accepted private account requests.
-
----
+Used for public account follows and accepted private account requests.
 
 ### Follow Requests
 
@@ -90,21 +82,17 @@ Stores:
 
 Converted into follower relationships when accepted.
 
----
-
 ### Feed Interaction
 
 The interaction collection acts as a relationship graph optimized for feed generation.
 
 Stores:
 
-* Author user id
-* Recipient user id
+* Author user ID
+* Recipient user ID
 * Creation timestamp
 
-Instead of repeatedly fetching all followers and friends whenever a post is created, the service maintains a precomputed interaction collection.
-
-This significantly reduces complexity during feed fan-out operations.
+Instead of repeatedly querying friends and followers when content is created, the service maintains precomputed interaction data for feed recipient lookup.
 
 ---
 
@@ -116,51 +104,41 @@ Users can send friendship requests to other users.
 
 Validation includes:
 
-* User existence validation
+* User existence
 * Duplicate friendship prevention
 * Duplicate request prevention
 
 If a reverse request already exists, the friendship is automatically accepted.
 
----
-
 ### Accept Friend Request
 
 When accepted:
 
-* Friendship document is created
-* Friend counters are incremented
+* Friendship is created
+* Friend counters are updated
 * Feed interactions are created for both users
-* Chat conversation is automatically created
+* Chat conversation creation is published asynchronously
 * Friend request is removed
-
----
 
 ### Reject Friend Request
 
 The pending request is removed without creating a friendship.
 
----
-
 ### Remove Friend
 
 Removing a friendship:
 
-* Deletes the friendship record
-* Decrements friend counters
+* Deletes the friendship
+* Updates friend counters
 * Removes feed interactions
-* Removes associated chat conversations
-
----
+* Publishes the corresponding Chat conversation deletion event
 
 ### Friend Search
 
 Supports cursor-based pagination and username filtering.
 
-Features:
-
-* Infinite scrolling support
-* Search by username
+* Infinite scrolling
+* Username search
 * Bidirectional friendship lookup
 
 ---
@@ -169,21 +147,15 @@ Features:
 
 ### Follow User
 
-For public accounts:
+For public accounts, the follow relationship is created immediately.
 
-* Follow relationship is created immediately
-
-For private accounts:
-
-* Follow request is created
+For private accounts, a follow request is created.
 
 Validation includes:
 
 * Self-follow prevention
 * Duplicate follow prevention
 * Duplicate request prevention
-
----
 
 ### Accept Follow Request
 
@@ -194,23 +166,17 @@ When accepted:
 * Feed interaction is generated
 * Request is removed
 
----
-
 ### Reject Follow Request
 
 Deletes the pending follow request.
-
----
 
 ### Unfollow
 
 Removing a follow:
 
-* Deletes follower record
+* Deletes the follower record
 * Updates counters
-* Removes interaction if no other relationship exists
-
----
+* Removes the interaction when no other relationship exists
 
 ### Remove Follower
 
@@ -221,8 +187,6 @@ The service updates:
 * Follower counters
 * Following counters
 * Interaction relationships
-
----
 
 ### Follower Search
 
@@ -237,23 +201,7 @@ Supports:
 
 ## Interaction Engine
 
-The interaction engine is one of the core architectural components of the service.
-
-### Why It Exists
-
-Without interaction aggregation, generating feeds would require:
-
-1. Fetching all friends
-2. Fetching all followers
-3. Merging results
-4. Removing duplicates
-5. Returning the final audience
-
-This becomes increasingly expensive as relationships grow.
-
-Instead, the Interaction Service maintains a dedicated interaction collection.
-
----
+The interaction engine maintains the relationship graph used by the platform's feed system.
 
 ### Interaction Creation
 
@@ -266,24 +214,18 @@ Interactions are created when:
 
 Example:
 
+```text
 User A follows User B
 
-Interaction created:
-
-Author = User B
-
+Author    = User B
 Recipient = User A
+```
 
-Future posts created by User B can immediately identify User A as a feed recipient.
-
----
+Future posts created by User B can therefore identify User A as a feed recipient without rebuilding the relationship graph.
 
 ### Interaction Removal
 
-Interactions are removed only when:
-
-* Friendship no longer exists
-* Follow relationship no longer exists
+Interactions are removed only when the corresponding relationship no longer exists.
 
 This prevents accidental deletion when multiple relationship types still connect two users.
 
@@ -291,7 +233,7 @@ This prevents accidental deletion when multiple relationship types still connect
 
 ## Feed Generation Support
 
-The service exposes internal APIs used by the Feed Service.
+The service exposes internal APIs used by the Feed Service to retrieve relationship-based recipients.
 
 ### Interaction Fetch API
 
@@ -300,41 +242,35 @@ Returns:
 * Recipient users
 * Cursor information
 
-Used when a new post is created.
-
-Workflow:
-
-1. Post Service creates post
-2. Feed Service requests interactions
-3. Interaction Service returns recipients
-4. Feed Service fans out the post
-
-This avoids expensive relationship joins during feed generation.
+Used during feed generation when the Feed Service needs to determine the recipients for content.
 
 ---
 
 ## Profile Denormalization
 
-Relationship documents store profile snapshots:
+Relationship documents contain profile snapshots such as:
 
 * Username
 * Avatar
 
-This avoids profile lookups during reads.
+This avoids additional Profile Service lookups during relationship reads.
 
-When profile data changes:
+When profile data changes, Profile Service publishes a profile event to Kafka.
 
-1. Profile Service sends denormalization request
-2. Interaction Service updates all relationship collections
+### Topic
 
-Updated collections:
+```text
+profile-interaction-events
+```
+
+The Interaction Service consumes the event and updates the relevant relationship collections:
 
 * Friends
 * Friend Requests
 * Followers
 * Follow Requests
 
-Denormalization runs asynchronously.
+Processed event IDs are stored in Redis with a **24-hour TTL** to provide idempotent event processing.
 
 ---
 
@@ -342,99 +278,103 @@ Denormalization runs asynchronously.
 
 The service exposes an internal API used by the Profile Service.
 
-Given:
-
-* Current user
-* Target profile
-
-The service returns:
+Given a current user and target profile, it returns relationship information such as:
 
 * Is Friend
 * Is Following
 
-This allows the Profile Service to render the correct UI state without performing relationship queries itself.
-
-Examples:
-
-* Follow button
-* Following button
-* Add Friend button
-* Friends badge
+This allows the Profile Service to render the appropriate relationship state.
 
 ---
 
 ## Chat Service Integration
 
-Friendship creation automatically provisions conversations.
+Friendship changes are synchronized with the Chat Service asynchronously through Kafka.
 
 When users become friends:
 
-* Conversation is created asynchronously
+* A conversation creation event is written to the Outbox
+* The event is published to Kafka
+* Chat Service consumes the event
 
-When friendship is removed:
+When a friendship is removed:
 
-* Conversation is deleted asynchronously
+* A conversation deletion event is written to the Outbox
+* The event is published to Kafka
+* Chat Service consumes the event
 
-This integration is protected using:
+### Topics
 
-* Retry
-* Circuit Breaker
-* Fallback methods
+```text
+conversation-create
+conversation-delete
+```
 
-using Resilience4j.
+The Outbox Pattern ensures that the event is persisted before it is published.
 
 ---
 
 ## Counter Service Integration
 
-Relationship events update profile statistics.
-
-Examples:
+Relationship changes update profile statistics such as:
 
 * Friends count
 * Followers count
 * Following count
 
-Counter updates are executed asynchronously through dedicated workers.
+Counter synchronization is handled asynchronously through the service's existing event/worker flow.
 
 ---
 
 ## Feed Service Integration
 
-The service notifies the Feed Service whenever new relationships are created.
+Feed relationship synchronization is handled asynchronously through Kafka.
 
-Generated interactions allow the Feed Service to distribute future content efficiently.
+When relationships change, the service generates feed interaction events for creation or deletion.
 
-Operations include:
+### Topics
 
-* Feed creation
-* Feed cleanup
-* Recipient synchronization
+```text
+create-feed-interaction
+delete-feed-interaction
+```
 
----
+The events are persisted through the Outbox Pattern before publication.
 
-## Reliability Features
-
-The service uses Resilience4j for critical cross-service communication.
-
-Features include:
-
-* Retry
-* Circuit Breaker
-* Fallback methods
-
-Applied to:
-
-* Chat Service integration
-* Feed synchronization
-
-Failures are logged without affecting the primary user operation.
+Feed Service consumes these events and updates the corresponding feed interaction data.
 
 ---
 
-## Pagination Strategy
+## Kafka & Outbox
 
-Cursor pagination is used throughout the service.
+The service uses the **Outbox Pattern** for reliable asynchronous event publishing.
+
+Events are first persisted in the service database and then published to Kafka by the scheduled publisher.
+
+### Produced Events
+
+| Topic                     | Purpose                   |
+| ------------------------- | ------------------------- |
+| `create-feed-interaction` | Create feed interactions  |
+| `delete-feed-interaction` | Delete feed interactions  |
+| `conversation-create`     | Create Chat conversations |
+| `conversation-delete`     | Delete Chat conversations |
+
+### Consumed Events
+
+| Topic                        | Purpose                 |
+| ---------------------------- | ----------------------- |
+| `profile-interaction-events` | Profile denormalization |
+
+Outbox records are cleaned up after **24 hours**.
+
+Redis stores processed Kafka event IDs for **24-hour idempotency**.
+
+---
+
+## Pagination
+
+Cursor-based pagination is used throughout the service.
 
 Cursor format:
 
@@ -447,86 +387,78 @@ Benefits:
 * Consistent ordering
 * No offset performance degradation
 * Infinite scrolling support
-* Scalable for large datasets
+* Suitable for large datasets
 
 ---
 
 ## Asynchronous Processing
 
-Several operations execute asynchronously:
+The service uses asynchronous processing for operations such as:
 
 * Profile denormalization
-* Feed generation
 * Feed synchronization
 * Counter updates
 * Conversation creation
 * Conversation deletion
-* Interaction creation
-* Interaction removal
+* Kafka event processing
 
-This keeps relationship operations responsive while allowing background processing.
+Kafka-based operations use the Outbox Pattern and Redis idempotency where applicable.
 
 ---
 
 ## Observability
 
-The service includes custom observability components:
+### Distributed Tracing
 
-### Request Tracing
+The service uses OpenTelemetry for distributed tracing.
 
-Each request receives a unique trace identifier using MDC.
+```text
+Service
+   │
+   ▼
+OpenTelemetry
+   │
+   ▼
+OpenTelemetry Collector
+   │
+   ▼
+Jaeger
+```
 
-Enables:
-
-* Request tracking
-* Distributed debugging
-* Log correlation
-
----
-
-### Structured Logging
-
-Controller APIs are automatically logged through AOP.
-
-Captured fields include:
-
-* Controller
-* API
-* Request status
-* Latency
-
----
+W3C trace context is propagated across service boundaries.
 
 ### Metrics
 
-Micrometer metrics are collected for all controller endpoints.
+Application and HTTP metrics are exposed through Spring Boot Actuator and Micrometer.
 
-Metrics include:
+```text
+Actuator + Micrometer
+        │
+        ▼
+    Prometheus
+        │
+        ▼
+     Grafana
+```
 
-* API request count
-* Success count
-* Error count
-* Latency
-* Percentiles (P50, P95, P99)
-
-Exposed through Spring Boot Actuator.
+Custom AOP metrics are also used for method-level measurements.
 
 ---
 
 ## Technology Stack
 
-* Java 21
+* Java 17
 * Spring Boot
-* Spring Security
 * Spring Data MongoDB
-* MongoDB
+* Redis
+* Apache Kafka
+* Kafka Outbox Pattern
 * Spring AOP
-* Micrometer
-* Spring Actuator
-* Resilience4j
+* Spring Boot Actuator
 * OpenFeign
-* Async Processing
-* MDC Tracing
+* OpenTelemetry
+* Prometheus
+* Docker
 
 ---
 
@@ -534,13 +466,9 @@ Exposed through Spring Boot Actuator.
 
 ### Interaction Collection
 
-A dedicated interaction collection introduces additional writes whenever relationships change.
+A dedicated interaction collection introduces additional writes when relationships change.
 
-However, it significantly simplifies feed generation and eliminates repeated friend/follower aggregation queries.
-
-The trade-off favors read efficiency and feed scalability.
-
----
+However, it simplifies feed recipient lookup and avoids repeatedly aggregating friend and follower relationships during feed generation.
 
 ### Denormalized Relationship Data
 
@@ -549,17 +477,17 @@ Usernames and avatars are stored inside relationship documents.
 Advantages:
 
 * Faster reads
-* Fewer service calls
+* Fewer cross-service lookups
 * Reduced dependency on Profile Service
 
 Trade-off:
 
-* Requires asynchronous denormalization when profile data changes
+* Profile changes require asynchronous denormalization through Kafka.
 
 ---
 
 ## Summary
 
-The Social Interaction Service serves as the relationship backbone of the platform. It manages friendships, followers, requests, interaction graphs, feed recipient generation, profile denormalization, and chat provisioning.
+The Social Interaction Service provides the relationship layer of the platform, managing friendships, followers, requests, interaction graphs, feed relationships, profile denormalization, and Chat synchronization.
 
-By maintaining a dedicated interaction graph and denormalized relationship data, the service minimizes expensive cross-service queries and enables efficient feed fan-out operations while remaining resilient through asynchronous processing, retries, circuit breakers, metrics, tracing, and structured logging.
+The service uses **Kafka and the Outbox Pattern** for reliable asynchronous Feed and Chat synchronization, with **Redis-based idempotency** for Kafka consumers. Observability is provided through **OpenTelemetry, Jaeger, Micrometer, Prometheus, and Grafana**.
