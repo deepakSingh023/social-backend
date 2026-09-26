@@ -2,191 +2,481 @@
 
 ## Overview
 
-The Social Media Backend is deployed as a collection of independent Spring Boot microservices using Docker Compose. Most services run as a single container, while the Chat Service is deployed using multiple instances behind an Nginx reverse proxy to demonstrate horizontal scalability. Managed cloud services are used for persistent storage and object storage, while Redis is containerized to support inter-instance messaging.
+The Social Media Backend is deployed as independently deployable Spring Boot microservices using Docker Compose.
 
-Rather than hosting all infrastructure locally, the platform connects to managed cloud services including MongoDB Atlas for document storage, Supabase PostgreSQL for authentication data, and Cloudflare R2 for media storage. This approach reduces infrastructure management while preserving the distributed nature of the system.
+The deployment combines application containers, infrastructure containers, and managed external services.
+
+### Application and Infrastructure
+
+* Spring Boot microservices
+* Spring Cloud Gateway
+* Apache Kafka
+* Redis
+* Prometheus
+* Grafana
+* OpenTelemetry Collector
+* Jaeger
+
+### Managed Services
+
+* MongoDB
+* Cloudflare R2
+
+Docker Compose provides the shared network, service configuration, resource constraints, and replica configuration used by the deployment.
 
 ---
 
 ## Deployment Architecture
 
-![deployment-architecture.png](images/deployment-architecture.png)
+```text
+                         Client
+                           |
+                           v
+                    API Gateway :8091
+                           |
+          +----------------+----------------+
+          |                |                |
+          v                v                v
+     REST Services     Chat Service      WebSocket
+          |                |                |
+          v                v                v
+       MongoDB          MongoDB           Redis
 
-The deployment consists of three logical layers:
 
-* Infrastructure Layer
-* Application Services Layer
-* Client Layer
+                 Asynchronous Communication
 
-Infrastructure components provide persistence, messaging, networking, and object storage, while application services implement the business domains of the platform.
+                    Service
+                       |
+                       v
+                     Outbox
+                       |
+                       v
+                     Kafka
+                       |
+              +--------+--------+
+              |        |        |
+              v        v        v
+           Consumer Consumer Consumer
+
+
+                    Observability
+
+ Services
+    |
+    +---- OpenTelemetry ----> OTel Collector ----> Jaeger
+    |
+    +---- Actuator/Micrometer ----> Prometheus ----> Grafana
+```
+
+The API Gateway handles external application traffic.
+
+Kafka handles selected asynchronous workflows, while Redis provides shared state and Chat Service instance routing.
 
 ---
 
-### Infrastructure Components
+## Infrastructure Components
 
-The deployment combines containerized application services with managed cloud infrastructure.
+| Component               | Deployment         | Purpose                                                             |
+| ----------------------- | ------------------ | ------------------------------------------------------------------- |
+| MongoDB                 | Managed / External | Service persistence                                                 |
+| Redis                   | Docker             | Idempotency, coordination, rate limiting, Chat presence and routing |
+| Apache Kafka            | Docker             | Asynchronous service communication                                  |
+| Prometheus              | Docker             | Metrics collection                                                  |
+| Grafana                 | Docker             | Metrics visualization                                               |
+| OpenTelemetry Collector | Docker             | Trace collection                                                    |
+| Jaeger                  | Docker             | Distributed trace visualization                                     |
+| Cloudflare R2           | Managed Cloud      | Image and video storage                                             |
 
-| Component           | Deployment       | Purpose                                          |
-| ------------------- | ---------------- | ------------------------------------------------ |
-| MongoDB Atlas       | Managed Cloud    | Primary document database for domain services    |
-| Supabase PostgreSQL | Managed Cloud    | Authentication database                          |
-| Redis               | Docker Container | Pub/Sub communication for Chat Service           |
-| Cloudflare R2       | Managed Cloud    | Object storage for images and videos             |
-| Nginx               | Docker Container | Reverse proxy and load balancer for Chat Service |
-
-MongoDB Atlas, Supabase PostgreSQL, and Cloudflare R2 are accessed as managed cloud services over the internet, while Redis and Nginx run locally inside Docker Compose. This hybrid deployment reduces infrastructure management while maintaining a reproducible local development environment.
+Application containers communicate with containerized infrastructure through the shared Docker network.
 
 ---
 
 ## Application Services
 
-The deployment consists of multiple independently deployable services.
+| Service                | Responsibility                                           |
+| ---------------------- | -------------------------------------------------------- |
+| Authentication Service | Authentication and JWT generation                        |
+| Profile Service        | User profile management                                  |
+| Post Service           | Post management                                          |
+| Feed Service           | Feed generation and storage                              |
+| Reel Service           | Reel storage and recommendation data                     |
+| Reel Fetch Service     | Reel retrieval and orchestration                         |
+| Interest Service       | User interest management                                 |
+| View Service           | View tracking                                            |
+| Interaction Service    | Friends, followers, relationships, and interaction graph |
+| Likes Service          | Likes and comments                                       |
+| Chat Service           | Real-time messaging and conversations                    |
 
-| Service                | Responsibility                          |
-| ---------------------- | --------------------------------------- |
-| Authentication Service | User authentication and JWT generation  |
-| Profile Service        | User profile management                 |
-| Post Service           | Post management                         |
-| Feed Service           | Fan-out-on-write feed generation        |
-| Reel Service           | Reel storage and recommendation ranking |
-| Reel Fetch Service     | Recommendation orchestration            |
-| Interest Service       | User interest management                |
-| Interaction Service    | Friend and follow management            |
-| Likes Service          | Likes and comments                      |
-| View Service           | View tracking and popularity updates    |
-| Chat Service           | Real-time messaging                     |
+Each service owns its business logic and persistence boundary.
 
-Each service owns its own business logic and communicates with other services through well-defined APIs.
+Services do not directly access another service's database.
+
+---
+
+## API Gateway
+
+The API Gateway is implemented using Spring Cloud Gateway and runs on host port `8091`.
+
+It is responsible for:
+
+* Request routing
+* JWT validation
+* CORS handling
+* Rate limiting
+* WebSocket routing
+* Gateway request validation
+* W3C trace propagation
+* Gateway-level logging and metrics
+
+After validating a request, the Gateway passes trusted headers to downstream services.
+
+Downstream services validate these headers through application-level gateway and internal filters.
 
 ---
 
 ## Container Networking
 
-![docker-network.png](images/docker-network.png)
+Application and infrastructure containers communicate through a shared Docker network.
 
+```text
+                    Docker Network
+                          |
+       +------------------+------------------+
+       |                  |                  |
+       v                  v                  v
+    Gateway             Kafka              Redis
+       |
+       +-------------------------+
+       |                         |
+       v                         v
+ Application Services      OTel Collector
+                                  |
+                                  v
+                                Jaeger
 
-All application containers communicate through Docker's internal network.
+ Application Services
+          |
+          v
+      Prometheus
+          |
+          v
+       Grafana
+```
 
-Services communicate using container names rather than host IP addresses, allowing containers to be restarted or recreated without modifying application configuration.
+Containers use Docker service names for internal communication rather than host IP addresses.
 
-Only externally required ports are exposed to the host system, while internal service communication remains isolated inside the Docker network.
+Only required services expose ports to the host.
+
+| Component               |      Host Port |
+| ----------------------- | -------------: |
+| Frontend                |         `3000` |
+| API Gateway             |         `8091` |
+| Grafana                 |         `3001` |
+| Prometheus              |         `9090` |
+| Jaeger UI               |        `16686` |
+| Redis                   |         `6379` |
+| OpenTelemetry Collector | `4317`, `4318` |
 
 ---
 
-## Service Communication During Deployment
+## Service Communication
 
-Application services communicate using synchronous REST requests implemented with OpenFeign.
+The system uses both synchronous and asynchronous communication.
 
-The Chat Service additionally uses:
+### Synchronous
 
-* STOMP over WebSocket for client communication
-* Redis Pub/Sub for inter-instance communication
+REST and OpenFeign are used when a service needs an immediate response from another service.
 
-This combination allows each service to remain independently deployable while supporting distributed workflows across the platform.
+### Asynchronous
+
+Kafka is used for workflows where an immediate response is not required.
+
+```text
+Producer Service
+      |
+      v
+    Outbox
+      |
+      v
+    Kafka
+      |
+      +------> Consumer
+      |
+      +------> Consumer
+      |
+      +------> Consumer
+```
+
+Current Kafka workflows include:
+
+* Profile denormalization
+* Feed creation and deletion
+* Interaction feed synchronization
+* Chat conversation creation
+* Chat conversation deletion
+
+The Outbox Pattern is used for reliable event publication.
 
 ---
 
-## Environment Configuration
+## Kafka and Outbox
 
-Application configuration is externalized through environment variables.
+Kafka runs as a Docker container and is available to application services through the Docker network.
 
-Typical configuration includes:
+The main event flows are:
 
-* Database connection strings
-* JWT secrets
-* Internal service authentication tokens
-* Cloudflare R2 credentials
-* Redis configuration
-* Service ports
+### Profile Events
 
-Separating configuration from application code allows the same container images to be deployed across different environments without modification.
+```text
+Profile Service
+      |
+    Outbox
+      |
+    Kafka
+      |
+      +---- Post
+      +---- Reel
+      +---- Likes
+      +---- Interaction
+```
+
+### Feed Events
+
+```text
+Post / Interaction
+       |
+     Outbox
+       |
+     Kafka
+       |
+       v
+   Feed Service
+```
+
+### Conversation Events
+
+```text
+Interaction Service
+        |
+      Outbox
+        |
+      Kafka
+        |
+        v
+   Chat Service
+```
+
+The Chat Service consumes:
+
+* `conversation-create`
+* `conversation-delete`
+
+Where implemented, consumers use Redis to store processed event IDs for a 24-hour idempotency window.
+
+Outbox records are cleaned up after 24 hours.
 
 ---
 
-## Running the Platform
+## Redis
 
-The complete backend can be started using Docker Compose after providing the required environment variables and infrastructure credentials.
+Redis is used for several different parts of the deployment:
 
-Typical deployment process:
+* Kafka consumer idempotency
+* Distributed coordination
+* Gateway rate-limiting state
+* Chat WebSocket presence
+* Chat Service instance routing
+* Chat Redis Pub/Sub
 
-1. Configure environment variables.
-2. Start Docker Compose.
-3. Redis and Nginx containers are initialized.
-4. Application service containers start.
-5. Services establish connections to MongoDB Atlas, Supabase PostgreSQL, Cloudflare R2, and Redis.
-6. Once the required cloud services are reachable and all application services complete initialization, the platform becomes available for client requests.
+For Chat Service scaling, Redis maintains the relationship between connected users and their Chat Service instances.
 
-The deployment has been designed so that the complete application stack can be started from a single Docker Compose configuration after the required cloud service credentials have been configured.
+```text
+User
+ |
+ v
+Chat Instance
+ |
+ v
+Redis
+ |
+ +---- User:{userId} ------> instance
+ |
+ +---- SessionId:{sessionId} -> user
+ |
+ +---- chat-channel:{instanceId}
+```
+
+Redis stores transient coordination and routing state. Persistent chat messages remain in MongoDB.
+
+---
+
+## Chat Service Scaling
+
+The Chat Service supports multiple instances.
+
+Nginx is not used for inter-instance message routing. Redis handles this part of the architecture.
+
+```text
+             Chat Client A                 Chat Client B
+                    |                             |
+                    v                             v
+             Chat Instance A               Chat Instance B
+                    |                             |
+                    +-------------+---------------+
+                                  |
+                                  v
+                                Redis
+                                  |
+                    +-------------+-------------+
+                    |                           |
+             channel:A                    channel:B
+```
+
+When a message is sent:
+
+1. The message is persisted in MongoDB.
+2. The receiver is identified from the conversation.
+3. Redis is used to find the receiver's active Chat Service instance.
+4. The message is published to that instance's Redis channel.
+5. That instance delivers the message through STOMP/WebSocket.
+
+This avoids broadcasting every message to every Chat Service instance.
+
+---
+
+## Resource Constraints
+
+The Docker Compose configuration defines CPU and memory constraints for the containers.
+
+These limits are important when running the complete backend locally because the deployment includes multiple application services together with Kafka, Redis, and the observability stack.
+
+The constraints prevent a single container from consuming an uncontrolled amount of the available host resources.
 
 ---
 
 ## Horizontal Scaling
 
-![chat-horizontal-scaling(1).png](images/chat-horizontal-scaling%281%29.png)
+The Compose configuration contains `deploy.replicas` settings for services.
 
-The current deployment demonstrates horizontal scaling using the Chat Service. Two Chat Service instances are deployed behind an Nginx reverse proxy, while Redis Pub/Sub propagates messaging events between instances.
+These settings can be used in environments supporting Docker Swarm-style deployment.
 
-Other application services currently run as single instances for simplicity, although their independent deployment model allows additional instances to be introduced if workload requirements increase.
+```text
+                  Service
+                     |
+          +----------+----------+
+          |          |          |
+          v          v          v
+       Instance 1 Instance 2 Instance 3
+```
 
+The Chat Service has been used to demonstrate multiple instances and cross-instance message delivery.
 
----
+Redis provides the instance routing required for this setup.
 
-## Deployment Considerations
-
-The current deployment emphasizes simplicity and reproducibility.
-
-Characteristics include:
-
-* Independent service containers
-* Hybrid deployment using managed cloud infrastructure
-* Database-per-service architecture
-* Internal Docker networking
-* Object storage separated from application services
-* Horizontal scaling demonstrated for the Chat Service
-
-The deployment is intended for development, experimentation, and small-scale production environments.
+A full multi-node Swarm deployment has not been tested locally.
 
 ---
 
-## Current Trade-Offs
+## Observability
 
-Advantages:
+The deployment includes metrics and distributed tracing.
 
-* Simple deployment process
-* * Hybrid deployment using managed cloud services
-* Clear service isolation
-* Independent service deployment
-* Production-like development environment
+### Metrics
 
-Limitations:
+```text
+Spring Boot Services
+        |
+Actuator / Micrometer
+        |
+        v
+Prometheus :9090
+        |
+        v
+Grafana :3001
+```
 
-* Synchronous service communication
-* No centralized service discovery
-* No orchestration platform such as Kubernetes
-* Manual environment configuration
-* Limited automated deployment support
+Spring Boot Actuator and Micrometer expose service and JVM metrics.
+
+Prometheus collects the metrics and Grafana provides dashboards for inspection.
+
+### Distributed Tracing
+
+```text
+Spring Boot Services
+        |
+        v
+OpenTelemetry
+        |
+        v
+OTel Collector
+        |
+        v
+Jaeger :16686
+```
+
+OpenTelemetry provides distributed tracing instrumentation.
+
+The OpenTelemetry Collector receives the trace data and forwards it to Jaeger.
+
+W3C Trace Context propagation allows traces to be correlated across service boundaries.
 
 ---
 
-## Future Improvements
+## Environment Configuration
 
-Potential deployment enhancements include:
+Environment-specific configuration is supplied through environment variables.
+
+The deployment uses environment variables for:
+
+* MongoDB connection strings
+* Redis configuration
+* Kafka configuration
+* JWT secrets
+* Gateway and internal service secrets
+* Cloudflare R2 credentials
+* OpenTelemetry configuration
+* Service ports
+* Chat Service instance identifiers
+
+This keeps credentials and environment-specific configuration outside the application source code.
+
+---
+
+## Running the Platform
+
+After the required environment variables and external service credentials are configured, the backend can be started using Docker Compose.
+
+The deployment starts the infrastructure and application containers, after which the services connect to their configured databases and supporting infrastructure.
+
+The API Gateway then provides the external backend entry point.
+
+Prometheus, Grafana, OpenTelemetry Collector, and Jaeger run alongside the application and collect telemetry from the deployed services.
+
+---
+
+## Deployment Limitations
+
+The current deployment has several known limitations:
+
+* A full multi-node Swarm deployment has not been tested.
+* Automatic horizontal scaling is not implemented.
+* Redis Pub/Sub is transient and does not provide durable message delivery.
+* Environment configuration requires manual setup.
+* The deployment depends on externally configured MongoDB and Cloudflare R2 services.
+* Local resource limits restrict how many service replicas can be run comfortably.
+
+These limitations describe the current deployment rather than features that are planned or already implemented.
+
+---
+
+## Future Deployment Work
+
+Potential deployment improvements are:
 
 * Kubernetes orchestration
-* Automated CI/CD pipelines
-* Service discovery
-* Distributed configuration management
-* API Gateway integration
-* Container health monitoring
+* CI/CD deployment
+* Automated environment provisioning
+* Centralized secret management
+* Automated service scaling
+* Multi-node deployment testing
 * Centralized log aggregation
-* Automatic horizontal scaling
-
----
-
-## Conclusion
-
-The deployment architecture provides a reproducible environment for running the complete Social Media Backend using Docker Compose. Independent service containers, isolated infrastructure components, and container networking allow the platform to be deployed with minimal setup while preserving the characteristics of a distributed microservices architecture.
-
-The current implementation demonstrates horizontal scalability through the Chat Service while the remaining microservices are deployed as independent single instances. This architecture allows additional services to be replicated in the future as workload requirements evolve.
-
-The current deployment balances operational simplicity with architectural flexibility and provides a foundation for future migration to more advanced orchestration platforms.

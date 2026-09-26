@@ -1,280 +1,414 @@
-# Service Communication
+# S# Service Communication
 
 ## Overview
 
-The platform combines synchronous OpenFeign communication for request-response workflows with asynchronous background tasks for non-critical side effects such as profile creation, feed generation, conversation creation, and denormalized data synchronization.
+The backend uses two service communication models:
 
-The communication model is chosen based on the consistency requirements of each workflow. Operations that are required to complete before responding to the client use synchronous communication, while non-critical side effects such as feed generation, denormalization, and conversation creation are processed asynchronously.
+* **Synchronous communication:** OpenFeign for operations that require an immediate response.
+* **Asynchronous communication:** Kafka with the Outbox Pattern for operations that can continue after the original request completes.
 
-This hybrid communication model allows the platform to maintain responsive APIs while keeping related services synchronized.
+The main asynchronous workflows are profile denormalization, feed generation, and Chat conversation synchronization.
 
 ---
 
-## Communication Patterns
+## 1. Synchronous Communication
 
-The platform primarily uses two communication patterns.
+OpenFeign is used when a service needs data from another service before it can continue.
 
-### Synchronous Communication
+Typical uses include:
 
-Synchronous communication is implemented using OpenFeign clients.
-
-Synchronous communication is implemented using OpenFeign clients for service-to-service communication. It is used whenever a service requires data immediately to complete the current request before a response can be returned to the client.
-
-Typical synchronous operations include:
-
-* Authentication and authorization
-* Profile retrieval
-* Feed retrieval and feed enrichment
-* Recommendation retrieval
+* Profile and user data retrieval
 * Post retrieval
-* Like status retrieval
-* User interest retrieval
-* Conversation ID retrieval
-* Chat history retrieval
-* Media upload processing
+* Feed retrieval and enrichment
+* Like information
+* User interests
+* Recommendation data
+* Chat history
+* Other immediate service dependencies
 
-Synchronous communication ensures that clients receive complete and consistent responses before the request is completed.
+```text
+Service A
+    |
+    | OpenFeign
+    v
+Service B
+    |
+    v
+ Response
+```
 
-Some operations depend on data from other services before they can be completed safely. If a required synchronous dependency is unavailable, the primary operation is aborted rather than proceeding with incomplete or inconsistent data.
-
-For example, when creating a post or reel, the service retrieves user profile information for denormalization before persisting the content. If the Profile Service is unavailable, the post or reel creation request fails because the required metadata cannot be obtained. This approach prioritizes data consistency over partial request completion.
-
----
-
-### Asynchronous Communication
-
-Asynchronous communication is implemented using Spring's `@Async` support.
-
-Rather than delaying the client response, non-critical background operations are executed independently after the primary business operation has completed.
-
-Examples include:
-
-* Automatic profile creation after user registration
-* Feed generation after post creation
-* Feed generation after new follows or friendships
-* Conversation creation after friendship acceptance
-* Post and reel denormalization
-* Like and comment count synchronization
-
-This reduces response latency while maintaining eventual consistency between services.
+The calling service waits for the response, so the availability and latency of the downstream service directly affect the operation.
 
 ---
 
-## Internal Service Authentication
+## 2. Asynchronous Communication
 
-Inter-service communication is protected using internal service tokens.
+Kafka is used for workflows that do not need to block the original request.
 
-Each service validates incoming internal requests before executing privileged operations. This prevents external clients from directly invoking internal APIs while allowing trusted microservices to communicate securely.
+Current Kafka-based workflows:
 
-Client requests are authenticated using JWT tokens, whereas service-to-service communication relies on internal authentication.
-
----
-
-## Communication Architecture
-
-![service-communication-overview.png](images/service-communication-overview.png)
-
-The platform combines synchronous request-response communication with asynchronous background processing.
-
-User requests first complete the primary business operation. Additional side effects are then delegated to background tasks whenever immediate consistency is not required.
-
----
-
-## User Registration Workflow
-
-> ![signup-workflow.png](images/signup-workflow.png)
-
-When a new user registers:
-
-1. Authentication Service creates the user account.
-2. Authentication Service immediately returns the authentication response.
-3. Profile Service is invoked asynchronously.
-4. A default user profile is created.
-
-Because profile creation is independent from authentication, user registration is not delayed by additional service operations.
-
----
-
-## Post Creation Workflow
-
-![post-creation-workflow.png](images/post-creation-workflow.png)
-
-When a user creates a post:
-
-1. Client submits the post.
-2. Post Service stores the content.
-3. Post Service immediately returns success.
-4. Feed generation is triggered asynchronously.
-5. Feed Service retrieves follower information from Interaction Service.
-6. Feed entries are generated in batches.
-
-This approach keeps post creation lightweight while allowing feed generation to scale independently.
-
----
-
-## Social Interaction Workflow
-
-![friend-acceptance-workflow.png](images/friend-acceptance-workflow.png)
-
-When a follow or friendship is established:
-
-1. Interaction Service stores the relationship.
-2. Feed generation is triggered asynchronously.
-3. Feed Service retrieves historical posts from Post Service.
-4. Feed entries are created for the newly connected user.
-5. Chat Service creates a conversation document for future messaging.
-
-Separating these side effects from the primary interaction request reduces user-visible latency while ensuring the platform remains eventually consistent.
-
----
-
-## Feed Retrieval Workflow
-
-Feed retrieval is a synchronous orchestration process.
-
-The workflow consists of:
-
-1. Feed Service retrieves feed entries.
-2. Feed Service requests post details from Post Service.
-3. Feed Service requests like information from Likes Service.
-4. The completed feed is returned to the client.
-
-Because the client requires all information before rendering the feed, these operations are performed synchronously.
-
----
-
-## Recommendation Retrieval Workflow
-
-Recommendation generation also follows a synchronous orchestration model.
-
-The workflow consists of:
-
-1. Reel Fetch Service receives the request.
-2. User interests are retrieved from Interest Service.
-3. Interest information is forwarded to Reel Service.
-4. Reel Service ranks reels using interest scores and popularity.
-5. Reel Service enriches recommendations with like information from Likes Service.
-6. Ranked recommendations are returned to the client through Reel Fetch Service.
-
-Unlike Feed Service, Reel Fetch Service primarily coordinates recommendation retrieval while the ranking logic remains within Reel Service.
-
----
-
-## Engagement Update Workflow
-
-![engagement-update-workflow.png](images/engagement-update-workflow.png)
-
-User engagement events update multiple services.
-
-Examples include:
-
-* WATCH_50
-* WATCH_90
-* LIKE
-
-Workflow:
-
-1. Client sends an engagement event.
-2. View Service records the event.
-3. View Service requests Reel Service to update popularity.
-4. Reel Service recalculates popularity and returns semantic tags.
-5. View Service forwards semantic tags and event information to Interest Service.
-6. Interest Service updates the user's interest profile.
-
-A single engagement event therefore contributes to both recommendation ranking and user interest modeling.
-
----
-
-## Fault Tolerance
-
-The platform uses Resilience4j to improve the reliability of inter-service communication.
-
-![retry-mechanism(1).png](images/retry-mechanism%281%29.png)
-
-Retry and Circuit Breaker patterns are applied to both synchronous and asynchronous service calls depending on the criticality of the workflow.
-
-Typical use cases include:
-
-* Automatic profile creation after user registration
-* Feed generation after post creation
-* Feed generation after new social interactions
-* Conversation creation and deletion
 * Profile denormalization
-* Feed retrieval from dependent services
-* Cleanup of likes and comments during content deletion
+* Post → Feed generation
+* Interaction → Feed generation
+* Conversation creation
+* Conversation deletion
 
-For asynchronous background operations, retries are attempted before the Circuit Breaker invokes a fallback method that records the failure for monitoring.
+```text
+Producer Service
+      |
+      v
+   Outbox
+      |
+      v
+    Kafka
+      |
+      +----> Consumer
+      +----> Consumer
+      +----> Consumer
+```
 
-For synchronous retrieval operations, fallback methods return safe default responses when dependent services are unavailable. This prevents cascading failures while allowing the requesting service to degrade gracefully.
+The producing service stores the event in its Outbox. A scheduled publisher then publishes pending events to Kafka.
 
 ---
 
-## Eventual Consistency
+## 3. Outbox Pattern
 
-The platform intentionally adopts eventual consistency for background operations.
+The Outbox Pattern is used for the main Kafka-producing workflows.
 
-Examples include:
+```text
+Business Operation
+       |
+       v
+Service Database
+   |          |
+   |          +---- Domain Data
+   |
+   +--------------- Outbox Event
+                         |
+                         v
+                 Scheduled Publisher
+                         |
+                         v
+                       Kafka
+                         |
+                         v
+                    Consumers
+```
 
+The business data and its corresponding Outbox event are stored by the producing service before the event is published.
+
+This keeps event creation tied to the business operation instead of relying on a separate network call after the transaction.
+
+Outbox records are cleaned up after the configured 24-hour retention period.
+
+---
+
+## 4. Profile Denormalization
+
+Profile changes are propagated through Kafka to services that maintain denormalized profile information.
+
+```text
+                    Profile Service
+                          |
+                        Outbox
+                          |
+                          v
+                        Kafka
+                          |
+          +---------------+---------------+
+          |               |               |
+          v               v               v
+     Post Service    Reel Service    Likes Service
+          |
+          v
+ Interaction Service
+```
+
+Consumers:
+
+* Post Service
+* Reel Service
+* Likes Service
+* Interaction Service
+
+These services update their local profile data instead of requiring synchronous Profile Service calls for every read.
+
+Where implemented, Redis stores processed event IDs to provide consumer idempotency.
+
+---
+
+## 5. Feed Generation
+
+Feed generation is asynchronous and can be triggered by both Post Service and Interaction Service.
+
+### Post Creation
+
+```text
+Post Service
+     |
+   Outbox
+     |
+     v
+   Kafka
+     |
+     v
+Feed Service
+     |
+     +----> Interaction Service
+     |
+     v
+Batch Feed Generation
+```
+
+When a post is created, Post Service creates a feed event in its Outbox.
+
+Feed Service consumes the event, retrieves the required follower information from Interaction Service, and generates feed entries in batches.
+
+### New Relationship
+
+```text
+Interaction Service
+        |
+      Outbox
+        |
+        v
+      Kafka
+        |
+        v
+   Feed Service
+        |
+        +----> Post Service
+        |
+        v
+ Batch Feed Generation
+```
+
+When a new relationship requires existing posts to be added to a feed, Interaction Service publishes the corresponding event.
+
+Feed Service retrieves the required posts from Post Service and generates the feed entries.
+
+### Feed Dependencies
+
+Feed generation itself is asynchronous, but Feed Service still uses synchronous calls while processing the event.
+
+```text
+              Feed Service
+               /        \
+              v          v
+     Interaction      Post Service
+       Service
+          |               |
+       Retry/CB        Retry/CB
+```
+
+The calls to Post Service and Interaction Service use Resilience4j Retry and Circuit Breaker mechanisms.
+
+This protects batch feed generation from transient failures and continuously unavailable dependencies.
+
+---
+
+## 6. Conversation Synchronization
+
+Interaction Service publishes conversation changes through Kafka.
+
+```text
+Interaction Service
+        |
+      Outbox
+        |
+        v
+      Kafka
+        |
+        +---- conversation-create ----> Chat Service
+        |
+        +---- conversation-delete ----> Chat Service
+```
+
+Chat Service consumes these events and updates its conversation data.
+
+Redis event-ID tracking is used where implemented to prevent duplicate event processing.
+
+---
+
+## 7. Synchronous Read Flows
+
+Asynchronous processing is used for background updates, but read operations remain synchronous when the client needs the result immediately.
+
+### Feed Retrieval
+
+```text
+Client
+  |
+  v
+Feed Service
+  |
+  +----> Post Service
+  |
+  +----> Likes Service
+  |
+  v
+Feed Response
+```
+
+Feed Service retrieves the user's feed entries, obtains the corresponding post data and required like information, and assembles the response.
+
+### Recommendation Retrieval
+
+```text
+Client
+  |
+  v
+Reel Fetch Service
+  |
+  +----> Interest Service
+  |
+  +----> Reel Service
+  |
+  +----> Likes Service
+  |
+  v
+Recommendations
+```
+
+Reel Fetch Service coordinates the required service calls while recommendation and ranking logic remains in Reel Service.
+
+---
+
+## 8. Internal Service Communication
+
+External REST authentication and internal service authentication are handled separately.
+
+```text
+Client
+  |
+ JWT
+  v
+API Gateway
+  |
+ Trusted Gateway Headers
+  v
+REST Service
+
+Service A
+    |
+    | Internal Authentication
+    v
+Service B
+```
+
+For normal REST traffic, the API Gateway validates the client's JWT and adds trusted headers.
+
+Downstream services validate the expected Gateway or internal-service credentials before processing protected requests.
+
+---
+
+## 9. Event Idempotency
+
+Kafka consumers use Redis to track processed event IDs where idempotency is implemented.
+
+```text
+Kafka Event
+     |
+     v
+ Consumer
+     |
+     v
+   Redis
+     |
+     +---- Already processed? ---> Ignore
+     |
+     No
+     |
+     v
+ Process Event
+     |
+     v
+ Store Event ID
+```
+
+Processed event IDs are retained for the configured 24-hour period.
+
+This prevents duplicate processing during that window.
+
+---
+
+## 10. Communication Architecture
+
+```text
+                         Client
+                           |
+                           v
+                      API Gateway
+                           |
+              +------------+------------+
+              |            |            |
+              v            v            v
+          REST APIs    Feed/Retrieval   Chat
+              |            |            |
+          OpenFeign    OpenFeign     WebSocket
+              |
+              |
+       Asynchronous Workflows
+              |
+       +------+--------+---------+
+       |               |         |
+    Profile           Post   Interaction
+       |               |         |
+    Outbox           Outbox    Outbox
+       |               |         |
+       +---------------+---------+
+                       |
+                      Kafka
+                       |
+          +------------+------------+
+          |            |            |
+        Feed         Chat       Profile
+                                Consumers
+```
+
+---
+
+## 11. Communication Model
+
+| Workflow                        | Mechanism                         |
+| ------------------------------- | --------------------------------- |
+| Client → Backend                | API Gateway / REST                |
+| Service data retrieval          | OpenFeign                         |
+| Profile denormalization         | Kafka + Outbox                    |
+| Post → Feed generation          | Kafka + Outbox                    |
+| Interaction → Feed generation   | Kafka + Outbox                    |
+| Interaction → Chat conversation | Kafka + Outbox                    |
+| Feed dependency calls           | OpenFeign + Retry/Circuit Breaker |
+| Feed retrieval                  | OpenFeign                         |
+| Recommendation retrieval        | OpenFeign                         |
+| Chat client communication       | WebSocket / STOMP                 |
+| Kafka consumer idempotency      | Redis                             |
+
+---
+
+## 12. Consistency Model
+
+The Kafka-based workflows are eventually consistent.
+
+The original operation can complete before the consuming service processes its event.
+
+This applies to:
+
+* Profile denormalization
 * Feed generation
 * Conversation creation
-* Profile creation
-* Denormalized counter updates
+* Conversation deletion
+* Other related asynchronous updates
 
-Temporary inconsistencies may exist immediately after an operation completes, but affected services are synchronized shortly afterward through asynchronous processing.
+This behavior is intentional because these operations do not need to block the original client request.
 
-This approach reduces request latency while maintaining acceptable consistency for social media workloads.
+## Summary
 
----
+The communication model is deliberately mixed:
 
-## Failure Handling
+* **OpenFeign** is used when the current operation needs another service's response.
+* **Kafka + Outbox** is used when work can continue independently of the original request.
+* **Redis** provides event-id idempotency for applicable Kafka consumers.
+* **Resilience4j** protects the synchronous dependencies used during asynchronous feed generation.
 
-The communication model is designed to isolate failures while preventing them from unnecessarily affecting independent services.
-
-For asynchronous background operations, transient failures are automatically retried using Resilience4j before the configured fallback method is invoked. If all retry attempts are exhausted, the failure is recorded through logging while the original client request remains successful. This allows background tasks such as feed generation, profile creation, conversation creation, and denormalization to fail independently without requiring the user to repeat the initiating action.
-
-For synchronous operations, dependent service failures are handled according to the requirements of the workflow. Requests that require data to maintain consistency, such as post or reel creation with profile denormalization, are aborted if the required dependency is unavailable. For retrieval operations where partial responses are acceptable, fallback methods may return safe default responses to degrade gracefully instead of propagating the failure.
-
-
----
-
-## Current Trade-Offs
-
-Advantages:
-
-* Clear separation between synchronous and asynchronous workflows
-* Reduced client response latency
-* Eventual consistency for non-critical operations
-* Independent service deployment
-* Simple service coordination using REST APIs
-
-Limitations:
-
-* Synchronous operations remain dependent on service availability
-* No centralized message broker 
-* Fallbacks currently provide logging or simplified responses rather than recovery workflows 
-* No centralized retry queue
-* No distributed transaction management
-* Background tasks are processed within service instances
-
-
----
-
-## Future Improvements
-
-Potential enhancements include:
-
-* Kafka-based event streaming
-* Dedicated background worker services
-* Distributed tracing
-* Service discovery
-* Event-driven communication for additional workflows
-
----
-
-## Conclusion
-
-The communication architecture combines synchronous REST communication with asynchronous background processing to balance responsiveness and consistency across the platform.
-
-Critical request-response operations complete synchronously, while non-essential side effects execute asynchronously to reduce latency. This hybrid approach keeps services loosely coupled, supports independent deployment, and provides a practical communication model for a distributed social media backend while remaining extensible for future event-driven enhancements.
-
-Critical service-to-service communication is further protected using retry and circuit breaker mechanisms implemented with Resilience4j.
+The result is synchronous communication for immediate data requirements and asynchronous communication for decoupled background workflows.

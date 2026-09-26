@@ -2,70 +2,98 @@
 
 ## Overview
 
-The Chat Service provides real-time messaging capabilities using STOMP over WebSocket connections.
+The Chat Service provides real-time messaging using STOMP over WebSocket connections.
 
-Unlike traditional request-response services, the Chat Service maintains persistent client connections and supports low-latency communication between users.
+The service uses a conversation-based messaging model where messages belong to a conversation rather than being sent directly between user IDs. Conversations are created when users become friends and are synchronized asynchronously through Kafka.
 
-The service is built around a conversation-based messaging model where all messages belong to a conversation. Conversations are automatically created when social relationships are established and serve as the primary communication channel between users.
+The service supports persistent chat history, media messages, conversation management, WebSocket authentication, and horizontal scaling.
 
-To support horizontal scaling, Redis Pub/Sub is used for cross-instance message propagation, allowing users connected to different chat service instances to communicate seamlessly.
+Redis is used for WebSocket presence and targeted cross-instance message routing. Instead of broadcasting messages to every Chat Service instance, the service identifies the instance where the receiving user is connected and publishes the message only to that instance.
 
-The Chat Service is also responsible for message persistence, conversation management, chat history retrieval, and media message delivery.
+---
 
 ## Design Goals
 
 * Real-time communication
-* Low message delivery latency
+* Low-latency message delivery
 * Conversation-based messaging
 * Persistent message storage
 * Horizontal scalability
+* Targeted cross-instance routing
 * Independent deployment and scaling
-* Fault isolation from other platform services
+* Asynchronous conversation synchronization
 
 ---
 
 ## Why a Dedicated Chat Service
 
-Messaging workloads have significantly different requirements compared to traditional REST APIs.
+Messaging workloads have different requirements from traditional REST services.
 
-Requirements include:
+The Chat Service handles:
 
-* Persistent STOMP over WebSocket connections
-* Real-time message delivery
+* Persistent WebSocket connections
+* STOMP messaging
 * Conversation management
 * Chat history persistence
-* Session management
-* Cross-instance communication
+* WebSocket authentication
+* Cross-instance message routing
 * Media message support
 
-Separating chat functionality into a dedicated service prevents messaging workloads from affecting content-oriented services such as Posts, Reels, Feed Generation, and Recommendations.
+Keeping these workloads separate prevents persistent WebSocket connections and real-time traffic from directly affecting content-oriented services such as Posts, Reels, and Feed generation.
 
 ---
 
-## High Level Architecture
+## High-Level Architecture
 
-![Chat Architecture](images/chat-architecture.png)
+The Chat Service consists of:
 
-The architecture consists of:
-
-* STOMP Clients
-* Chat Service Instances
-* Redis Pub/Sub
+* WebSocket/STOMP clients
+* Chat Service instances
+* Redis
 * MongoDB
+* Kafka
 * Interaction Service
 * Cloudflare R2
 
-Clients establish persistent WebSocket connections with Chat Service instances. Messages are persisted in MongoDB and propagated across instances through Redis Pub/Sub.
+REST requests enter through the API Gateway. WebSocket connections use the Chat Service directly and are authenticated during the STOMP `CONNECT` phase.
 
-Media files are uploaded through the Chat Service and stored in Cloudflare R2. The resulting URL is then transmitted through the messaging system.
+```text
+                         Client
+                           |
+             +-------------+-------------+
+             |                           |
+          REST API                   WebSocket
+             |                           |
+             v                           v
+        API Gateway                Chat Service
+             |                    Instance A / B
+             |                           |
+             v                           |
+       Chat REST APIs                    |
+                                         |
+                    +--------------------+
+                    |
+                    v
+                  Redis
+                    |
+          Targeted instance channel
+                    |
+                    v
+             Receiving Instance
+                    |
+                    v
+             WebSocket Client
+
+MongoDB  <---- Chat messages
+Kafka    <---- Conversation events
+R2       <---- Media files
+```
 
 ---
 
 ## Conversation Model
 
 The Chat Service uses a conversation-based architecture.
-
-Conversation document example:
 
 ```json
 {
@@ -76,54 +104,78 @@ Conversation document example:
 }
 ```
 
-Each conversation uniquely identifies a communication channel between two users.
+Each conversation represents the communication channel between two users.
 
-Messages reference conversations rather than directly referencing recipient users.
-
-This design simplifies chat history retrieval and conversation management.
+Messages reference the `conversationId` rather than directly identifying the recipient. This provides a stable key for message persistence and history retrieval.
 
 ---
 
-## Conversation Creation Workflow
+## Conversation Synchronization
 
-![Conversation Creation Workflow](images/chat-conversation-flow.png)
+Conversation creation and deletion are handled asynchronously through Kafka.
 
-Conversations are automatically created after a successful social relationship is established.
+When a friendship is created:
 
-Workflow:
+```text
+Interaction Service
+        |
+        v
+      Outbox
+        |
+        v
+      Kafka
+        |
+        v
+    Chat Service
+        |
+        v
+ Create Conversation
+```
 
-1. User sends a friend request.
-2. Request is accepted.
-3. Interaction Service creates the relationship.
-4. Interaction Service calls Chat Service.
-5. Chat Service creates a Conversation document.
-6. Conversation ID becomes available for future messaging.
+When the friendship is removed, the corresponding deletion event follows the same flow.
 
-This ensures users always have a valid conversation before message exchange begins.
+### Kafka Topics
+
+```text
+conversation-create
+conversation-delete
+```
+
+The Chat Service uses Redis to track processed event IDs for **24 hours**, preventing duplicate processing of the same Kafka event.
+
+This removes the need for synchronous conversation creation/deletion calls between Interaction Service and Chat Service.
 
 ---
 
-## Conversation Retrieval Workflow
+## Conversation Retrieval
 
-When a user opens the chat interface:
+When a user opens a chat:
 
-1. Client requests a conversation identifier using the recipient user ID.
-2. Chat Service locates the conversation using both participant IDs.
-3. Conversation ID is returned.
-4. Client loads historical messages using the conversation ID.
-5. Future messages are associated with that conversation.
+```text
+Open Chat
+    |
+    v
+Get Conversation ID
+    |
+    v
+Load Chat History
+    |
+    v
+Connect / Use WebSocket
+    |
+    v
+Exchange Messages
+```
 
-The conversation ID acts as the primary identifier for all chat operations.
+The client obtains the conversation ID using the other participant's user ID.
 
-The frontend never sends messages directly using recipient identifiers. Instead, messages are associated with a conversation identifier generated during conversation creation. This allows message persistence, retrieval, and pagination to be performed efficiently using a single conversation key.
+Once the conversation is identified, message retrieval and messaging use the `conversationId`.
 
 ---
 
 ## Message Model
 
-Messages are stored independently from conversations and reference conversations through the conversationId field.
-
-Example:
+Messages are stored independently from conversations and reference the conversation through `conversationId`.
 
 ```json
 {
@@ -137,150 +189,370 @@ Example:
 }
 ```
 
-Supported message types:
+Supported message types include:
 
-* TEXT
-* IMAGE
-* VIDEO
+* `TEXT`
+* `IMAGE`
+* `VIDEO`
 
-Messages belong to conversations and are retrieved through conversation-based queries.
+MongoDB is the source of truth for persisted messages.
 
 ---
 
-## Message Delivery Workflow
-
-![Message Delivery Workflow](images/chat-message-flow.png)
+## Message Delivery
 
 When a user sends a message:
 
-1. Client publishes a STOMP message.
-2. Chat Service receives the message request.
-3. Message is persisted in MongoDB.
-4. Message event is published to Redis.
-5. Redis distributes the event across subscribed instances.
-6. Recipient's connected instance receives the event.
-7. Message is delivered through STOMP.
+```text
+Client
+  |
+  v
+STOMP SEND
+  |
+  v
+Chat Service
+  |
+  +---- Persist Message ---> MongoDB
+  |
+  v
+Redis Publisher
+  |
+  v
+Find Receiver Instance
+  |
+  v
+Targeted Redis Channel
+  |
+  v
+Receiver's Chat Instance
+  |
+  v
+STOMP Topic
+  |
+  v
+Receiver
+```
 
-This workflow ensures message delivery regardless of which chat service instance each user is connected to.
+The message is persisted before it is published for real-time delivery.
+
+Redis is used only as the transient cross-instance transport layer.
 
 ---
 
-## Media Message Workflow
+## WebSocket Authentication
 
-![Media Message Workflow](images/chat-media-flow.png)
+WebSocket connections are authenticated directly by the Chat Service.
 
-Media messages follow a different workflow than text messages.
+The WebSocket endpoint is:
 
-Media files are not transferred through WebSocket connections. Only the resulting Cloudflare R2 URL is transmitted through STOMP after successful upload.
+```text
+/ws
+```
 
-Workflow:
+During the STOMP `CONNECT` frame:
 
-1. Client uploads image or video using a REST endpoint.
-2. Chat Service compresses the media.
-3. Processed media is uploaded to Cloudflare R2.
-4. Public media URL is returned.
-5. Client sends the URL through STOMP.
-6. URL is stored as a chat message.
-7. Recipient receives the media URL through the normal messaging pipeline.
+1. The client sends its JWT in the `Authorization` header.
+2. `JwtChannelInterceptor` validates the token.
+3. The user ID is extracted from the JWT.
+4. The authenticated user is assigned as the WebSocket `Principal`.
+5. Subsequent STOMP frames inherit that authenticated principal.
 
-This approach prevents large media payloads from being transferred through WebSocket connections.
+The JWT is therefore validated once during connection establishment rather than for every WebSocket frame.
 
 ---
 
-## Multi-Instance Communication
+## WebSocket Routing
 
-![Multi Instance Communication](images/chat-scaling.png)
+Clients send messages through:
 
-The platform supports multiple Chat Service instances running simultaneously.
+```text
+/app/chat.send
+```
 
-Example:
+Conversation subscriptions use:
 
-* User A connected to Chat Instance 1
-* User B connected to Chat Instance 2
+```text
+/topic/conversation/{conversationId}
+```
 
-Redis acts as an event propagation layer:
+The Chat Service uses the STOMP broker to deliver messages to clients connected to the corresponding conversation.
 
-1. Instance 1 publishes a message event.
-2. Redis broadcasts the event.
-3. Instance 2 receives the event.
-4. Instance 2 delivers the message to User B.
+---
 
-This architecture removes the requirement for users to be connected to the same service instance.
+## Redis Presence and Instance Routing
+
+Redis maintains the relationship between connected users and Chat Service instances.
+
+When a user connects:
+
+```text
+WebSocket CONNECT
+       |
+       v
+Authenticated User
+       |
+       v
+Redis
+       |
+       +---- User:{userId} -> instance
+       |
+       +---- SessionId:{sessionId} -> userId
+```
+
+The service also tracks users associated with active conversations.
+
+When the WebSocket disconnects, the corresponding session and user routing information is removed from Redis.
+
+---
+
+## Targeted Redis Pub/Sub
+
+The current architecture uses **instance-targeted Redis Pub/Sub**.
+
+A message is not broadcast to every Chat Service instance.
+
+Instead:
+
+```text
+Sender
+  |
+  v
+Chat Instance A
+  |
+  v
+Conversation Members
+  |
+  v
+Find Receiver
+  |
+  v
+Redis User:{receiverId}
+  |
+  v
+Receiver Instance B
+  |
+  v
+chat-channel:B
+  |
+  v
+Chat Instance B
+  |
+  v
+WebSocket
+  |
+  v
+Receiver
+```
+
+Each Chat Service instance subscribes to its own channel:
+
+```text
+chat-channel:{instanceId}
+```
+
+This reduces unnecessary message propagation as the number of Chat Service instances increases.
+
+---
+
+## Horizontal Scaling
+
+Multiple Chat Service instances can run simultaneously.
+
+```text
+                    Load Balancer / Gateway
+                             |
+               +-------------+-------------+
+               |                           |
+               v                           v
+        Chat Instance A             Chat Instance B
+               |                           |
+               +-------------+-------------+
+                             |
+                           Redis
+```
+
+Redis maintains the user-to-instance mapping required for targeted message delivery.
+
+For example:
+
+```text
+User A -> chat-instance-1
+User B -> chat-instance-2
+```
+
+If User A sends a message to User B, the publisher resolves User B's instance and publishes only to:
+
+```text
+chat-channel:chat-instance-2
+```
+
+The architecture therefore allows WebSocket connections to be distributed across multiple Chat Service instances without requiring both users to connect to the same instance.
+
+---
+
+## Media Messages
+
+Media is not transmitted through the WebSocket connection.
+
+The client first uploads the media through the Chat Service:
+
+```text
+Client
+  |
+  v
+Media Upload
+  |
+  v
+Compression
+  |
+  v
+Cloudflare R2
+  |
+  v
+Public URL
+  |
+  v
+STOMP Message
+  |
+  v
+MongoDB + Recipient
+```
+
+Images are compressed before upload.
+
+Videos are compressed using FFmpeg.
+
+The resulting R2 URL is stored as message content and delivered through the normal messaging pipeline.
+
+---
+
+## REST Security
+
+REST APIs such as conversation lookup, chat history, and media upload pass through the API Gateway.
+
+The Chat Service does not perform JWT authentication or CORS handling for these REST requests.
+
+The service uses:
+
+* `GatewayHeaderFilter` for requests coming through the Gateway
+* `InternalFilter` for protected internal service communication
+
+The Gateway handles external JWT validation, routing, CORS, and rate limiting.
 
 ---
 
 ## Message Persistence and Ordering
 
-Messages are persisted before publication to Redis.
+Messages are persisted in MongoDB before being published to Redis.
 
-Benefits:
+This provides:
 
-* Durable chat history
+* Persistent chat history
 * Recovery after service restart
 * Conversation reconstruction
 * Historical message retrieval
 
-MongoDB acts as the source of truth while Redis serves as a transient transport layer.
+Redis Pub/Sub is used only for real-time transport and does not provide message durability.
 
-Message ordering is reconstructed using persisted creation timestamps during chat history retrieval. The current implementation does not use a dedicated ordering service.
+Chat history is retrieved using the conversation ID and ordered using persisted message timestamps.
+
+The current implementation does not use a dedicated distributed message-ordering mechanism.
 
 ---
 
-## Scalability Considerations
+## Observability
 
-The chat architecture supports horizontal scaling.
+### Metrics
 
-Additional Chat Service instances can be introduced behind a load balancer without requiring application-level changes.
+The service exposes metrics through Spring Boot Actuator and Micrometer.
 
-Scaling process:
+Prometheus collects the exposed metrics and Grafana is used for visualization.
 
-1. Deploy additional Chat Service instances.
-2. Connect instances to Redis.
-3. Route WebSocket traffic through a load balancer.
-4. Redis propagates messages between instances.
+Custom AOP metrics measure service-method latency and execution status.
 
-This allows connection capacity to scale independently from the rest of the platform.
+```text
+Service
+   |
+   v
+Actuator / Micrometer
+   |
+   v
+Prometheus
+   |
+   v
+Grafana
+```
+
+### Distributed Tracing
+
+Tracing uses OpenTelemetry with W3C Trace Context propagation.
+
+```text
+Chat Service
+     |
+     v
+OpenTelemetry
+     |
+     v
+OTel Collector
+     |
+     v
+Jaeger
+```
 
 ---
 
 ## Current Trade-Offs
 
-Advantages:
+### Redis Pub/Sub
 
-* Horizontally scalable architecture
-* Persistent message storage
-* Conversation-based organization
-* Low latency communication
-* Simple deployment model
+Redis provides low-latency cross-instance message transport but does not provide durable message delivery.
 
-Limitations:
+MongoDB remains the source of truth for chat history.
 
-* Redis Pub/Sub does not provide message durability
-* No delivery acknowledgement mechanism
-* No distributed presence tracking
-* Message ordering relies on persistence timestamps
-* Limited advanced messaging features
-* Conversations currently support only two participants
+### Instance Routing
+
+Targeted instance routing requires maintaining user presence and instance information in Redis.
+
+This adds Redis state but avoids broadcasting every message to every Chat Service instance.
+
+### Two-User Conversations
+
+The current conversation model is designed for two users. Group conversations are not part of the current implementation.
+
+### Delivery State
+
+The current message model contains a `delivered` field, but the architecture does not implement a complete distributed delivery-acknowledgement system.
 
 ---
 
-## Future Improvements
+## Technology Stack
 
-Potential future enhancements include:
-
-* Read receipts
-* Delivery acknowledgements
-* Typing indicators
-* User presence tracking
-* Group conversations
-* Message reactions
-* Kafka-based event streaming
-* Distributed session management
+* Java 21
+* Spring Boot
+* Spring WebSocket
+* STOMP
+* Spring Security
+* MongoDB
+* Redis
+* Apache Kafka
+* OpenFeign
+* Cloudflare R2
+* FFmpeg
+* Spring AOP
+* Micrometer
+* Spring Boot Actuator
+* Prometheus
+* OpenTelemetry
+* Jaeger
+* Docker
 
 ---
 
 ## Conclusion
 
-The Chat Service provides a dedicated real-time communication layer built around conversations, persistent storage, STOMP messaging, and Redis Pub/Sub based horizontal scaling.
+The Chat Service provides the platform's real-time communication layer using conversation-based messaging, persistent MongoDB storage, STOMP over WebSockets, and Redis-based cross-instance routing.
 
-The architecture supports text, image, and video messaging while maintaining conversation history and enabling communication across multiple service instances. The design demonstrates distributed systems concepts including event propagation, persistent messaging, conversation management, and horizontally scalable real-time communication.
+Kafka and the Outbox Pattern handle asynchronous conversation lifecycle events, while Redis maintains WebSocket presence and routes messages to the specific Chat Service instance hosting the receiving user.
+
+This architecture separates persistent message storage from transient real-time transport while allowing Chat Service instances to scale horizontally without requiring users in the same conversation to share the same server instance.
